@@ -1,5 +1,5 @@
 /* =========================================================
-   Doggy Style Workspace – FINAL styles.css (STABLE)
+   Doggy Style Workspace – FINAL styles.css (HERO FIX)
 ========================================================= */
 
 * {
@@ -16,6 +16,24 @@ html, body {
                Roboto, Helvetica, Arial, sans-serif;
 }
 
+/* ================= HERO / LOGO ================= */
+
+/* Hero standardmäßig AUS */
+.hero,
+.header,
+.logo {
+  display: none;
+}
+
+/* Nur auf Startseite sichtbar */
+#home.is-active ~ .hero,
+#home.is-active ~ .header,
+#home.is-active ~ .logo {
+  display: block;
+  position: relative;
+  z-index: 1;
+}
+
 /* ================= LAYOUT ================= */
 
 .shell {
@@ -24,15 +42,6 @@ html, body {
   padding: 0 14px;
   position: relative;
   z-index: 5;
-}
-
-/* ================= HEADER / HERO ================= */
-
-.hero,
-.header,
-.logo {
-  position: relative;
-  z-index: 1;
 }
 
 /* ================= NAVIGATION ================= */
