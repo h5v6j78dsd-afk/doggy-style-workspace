@@ -1,9 +1,9 @@
 /* =========================================================
-   Doggy Style Workspace – FINAL
-   Editor + Pflichtfelder + Unterschrift + PDF (iOS-safe)
+   Doggy Style Workspace – FINAL FIX
+   Rechtssicherer Editor + PDF sauber getrennt
 ========================================================= */
 
-const LS_KEY = "ds_final_state";
+const LS_KEY = "ds_final_fix";
 
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -19,7 +19,7 @@ function save(){
 
 /* ================= NAVIGATION ================= */
 $$(".tab").forEach(btn=>{
-  btn.onclick = ()=>{
+  btn.onclick=()=>{
     $$(".tab").forEach(b=>b.classList.remove("is-active"));
     btn.classList.add("is-active");
     $$(".panel").forEach(p=>p.classList.remove("is-active"));
@@ -49,21 +49,17 @@ $("#btnNewDoc").onclick = ()=>{
   openDoc(doc.id);
 };
 
-/* ================= HUNDE / KUNDEN ================= */
+/* ================= HUNDE ================= */
 $("#btnAddDog").onclick = ()=>{
   const name = prompt("Name des Hundes:");
   if(!name) return;
-
   const owner = prompt("Name Halter:");
   const phone = prompt("Telefon:");
 
   state.dogs.push({
     id: Date.now().toString(),
-    name,
-    owner,
-    phone
+    name, owner, phone
   });
-
   save();
   renderDogs();
 };
@@ -71,100 +67,79 @@ $("#btnAddDog").onclick = ()=>{
 function renderDogs(){
   const list = $("#dogList");
   list.innerHTML = "";
-
   if(!state.dogs.length){
-    list.innerHTML = "<div class='muted'>Noch keine Hunde/Kunden.</div>";
+    list.innerHTML = "<div class='muted'>Noch keine Hunde.</div>";
     return;
   }
-
   state.dogs.forEach(d=>{
-    const el = document.createElement("div");
-    el.className = "item";
-    el.innerHTML = `
-      <div>
-        <strong>${d.name}</strong>
-        <small>${d.owner || ""} · ${d.phone || ""}</small>
-      </div>
-    `;
+    const el=document.createElement("div");
+    el.className="item";
+    el.innerHTML=`<strong>${d.name}</strong><small>${d.owner} · ${d.phone}</small>`;
     list.appendChild(el);
   });
 }
 
 /* ================= DOKUMENTE ================= */
 function renderDocs(){
-  const list = $("#docList");
-  list.innerHTML = "";
-
+  const list=$("#docList");
+  list.innerHTML="";
   if(!state.docs.length){
-    list.innerHTML = "<div class='muted'>Noch keine Dokumente.</div>";
+    list.innerHTML="<div class='muted'>Noch keine Dokumente.</div>";
     return;
   }
-
   state.docs.forEach(d=>{
-    const dog = state.dogs.find(x=>x.id===d.dogId);
-    const el = document.createElement("div");
-    el.className = "item";
-    el.innerHTML = `
+    const dog=state.dogs.find(x=>x.id===d.dogId);
+    const el=document.createElement("div");
+    el.className="item";
+    el.innerHTML=`
       <div>
         <strong>${d.title}</strong>
-        <small>
-          ${dog ? "🐕 "+dog.name+" · " : ""}
-          ${new Date(d.updatedAt).toLocaleString("de-DE")}
-        </small>
+        <small>${dog?"🐕 "+dog.name+" · ":""}${new Date(d.updatedAt).toLocaleString("de-DE")}</small>
       </div>
-      <div class="actions">
-        <button class="smallbtn">Öffnen</button>
-      </div>
+      <button class="smallbtn">Öffnen</button>
     `;
-    el.querySelector("button").onclick = ()=>openDoc(d.id);
+    el.querySelector("button").onclick=()=>openDoc(d.id);
     list.appendChild(el);
   });
 }
 
 /* ================= EDITOR ================= */
-let currentDoc = null;
-let sig = null;
+let currentDoc=null;
+let sig=null;
 
 function openDoc(id){
-  currentDoc = state.docs.find(d=>d.id===id);
+  currentDoc=state.docs.find(d=>d.id===id);
   if(!currentDoc) return;
 
-  $("#editorTitle").textContent = currentDoc.title;
-  $("#editorMeta").textContent = "Große Hundeannahme";
-  $("#docName").value = currentDoc.title;
+  $("#editorTitle").textContent=currentDoc.title;
+  $("#editorMeta").textContent="Große Hundeannahme";
+  $("#docName").value=currentDoc.title;
 
   renderEditorForm();
   initSignature();
 
-  if(currentDoc.signature){
-    sig.load(currentDoc.signature);
-  }
+  if(currentDoc.signature) sig.load(currentDoc.signature);
 
   showPanel("editor");
 }
 
-/* ================= EDITOR-FORMULAR ================= */
+/* ================= EDITOR-FORM (RECHTSSICHER) ================= */
 function renderEditorForm(){
-  const root = $("#formRoot");
-  root.innerHTML = "";
+  const root=$("#formRoot");
+  root.innerHTML="";
 
-  /* Hund / Kunde */
-  const dogCard = document.createElement("div");
-  dogCard.className = "card";
-  dogCard.innerHTML = "<h2>Halter / Hund *</h2>";
+  // Hund/Kunde
+  const card=document.createElement("div");
+  card.className="card";
+  card.innerHTML="<h2>Halter / Hund *</h2>";
 
-  const sel = document.createElement("select");
-  sel.innerHTML =
-    `<option value="">– bitte auswählen –</option>` +
-    state.dogs.map(d =>
-      `<option value="${d.id}">${d.name} (${d.owner || ""})</option>`
-    ).join("");
-
-  sel.value = currentDoc.dogId;
-  sel.onchange = ()=> currentDoc.dogId = sel.value;
-
-  dogCard.appendChild(sel);
-  root.appendChild(dogCard);
+  const sel=document.createElement("select");
+  sel.innerHTML=`<option value="">– bitte auswählen –</option>`+
+    state.dogs.map(d=>`<option value="${d.id}">${d.name} (${d.owner})</option>`).join("");
+  sel.value=currentDoc.dogId;
+  sel.onchange=()=>currentDoc.dogId=sel.value;
+  card.appendChild(sel);
+  root.appendChild(card);
 
   addSection(root,"Angaben zum Hund",[
     field("hund_name","Name des Hundes *"),
@@ -214,14 +189,13 @@ function checkbox(key,label){
   return l;
 }
 
-/* ================= SPEICHERN (MIT PRÜFUNG) ================= */
-$("#btnSave").onclick = ()=>{
+/* ================= SPEICHERN (BLOCKIERT OHNE DATEN) ================= */
+$("#btnSave").onclick=()=>{
   const missing=[];
-
   if(!currentDoc.dogId) missing.push("Hund / Kunde");
   if(!currentDoc.fields.hund_name) missing.push("Name des Hundes");
   if(!currentDoc.fields.hund_rasse) missing.push("Rasse");
-  if(!currentDoc.fields.hund_alter) missing.push("Alter / Geburtsdatum");
+  if(!currentDoc.fields.hund_alter) missing.push("Alter");
   if(!currentDoc.fields.impfung) missing.push("Impfschutz");
   if(!currentDoc.fields.angaben_wahr) missing.push("Angaben wahrheitsgemäß");
   if(!currentDoc.fields.agb) missing.push("AGB");
@@ -232,37 +206,32 @@ $("#btnSave").onclick = ()=>{
     return;
   }
 
-  currentDoc.title = $("#docName").value || currentDoc.title;
-  currentDoc.updatedAt = Date.now();
+  currentDoc.title=$("#docName").value||currentDoc.title;
+  currentDoc.updatedAt=Date.now();
   save();
   alert("Gespeichert ✅");
 };
 
-/* ================= PDF / DRUCKEN (iOS-SAFE) ================= */
-$("#btnPrint").onclick = (e)=>{
+/* ================= PDF ================= */
+$("#btnPrint").onclick=(e)=>{
   e.preventDefault();
-  e.stopPropagation();
-
   document.body.classList.add("print-mode");
-
   setTimeout(()=>{
     window.print();
-    setTimeout(()=>{
-      document.body.classList.remove("print-mode");
-    },500);
+    setTimeout(()=>document.body.classList.remove("print-mode"),500);
   },100);
 };
 
-/* ================= UNTERSCHRIFT ================= */
+/* ================= SIGNATUR ================= */
 function initSignature(){
-  const canvas = $("#sigPad");
-  const ctx = canvas.getContext("2d");
+  const c=$("#sigPad");
+  const ctx=c.getContext("2d");
 
   function resize(){
-    const r = canvas.getBoundingClientRect();
-    const d = window.devicePixelRatio || 1;
-    canvas.width = r.width * d;
-    canvas.height = r.height * d;
+    const r=c.getBoundingClientRect();
+    const d=window.devicePixelRatio||1;
+    c.width=r.width*d;
+    c.height=r.height*d;
     ctx.setTransform(d,0,0,d,0,0);
     ctx.fillStyle="#fff";
     ctx.fillRect(0,0,r.width,r.height);
@@ -270,22 +239,21 @@ function initSignature(){
     ctx.lineWidth=2.5;
     ctx.lineCap="round";
   }
-
   resize();
 
-  let drawing=false,last=null;
+  let draw=false,last=null;
   const pos=e=>{
-    const b=canvas.getBoundingClientRect();
+    const b=c.getBoundingClientRect();
     return {x:e.clientX-b.left,y:e.clientY-b.top};
   };
 
-  canvas.onpointerdown=e=>{
-    canvas.setPointerCapture(e.pointerId);
-    drawing=true;
+  c.onpointerdown=e=>{
+    c.setPointerCapture(e.pointerId);
+    draw=true;
     last=pos(e);
   };
-  canvas.onpointermove=e=>{
-    if(!drawing) return;
+  c.onpointermove=e=>{
+    if(!draw) return;
     const p=pos(e);
     ctx.beginPath();
     ctx.moveTo(last.x,last.y);
@@ -293,22 +261,17 @@ function initSignature(){
     ctx.stroke();
     last=p;
   };
-  canvas.onpointerup=()=>{
-    drawing=false;
-    currentDoc.signature = canvas.toDataURL("image/png");
+  c.onpointerup=()=>{
+    draw=false;
+    currentDoc.signature=c.toDataURL("image/png");
   };
 
-  sig = {
+  sig={
     load(data){
       const img=new Image();
       img.onload=()=>{
         resize();
-        ctx.drawImage(
-          img,
-          0,0,
-          canvas.width/(window.devicePixelRatio||1),
-          canvas.height/(window.devicePixelRatio||1)
-        );
+        ctx.drawImage(img,0,0,c.width/(window.devicePixelRatio||1),c.height/(window.devicePixelRatio||1));
       };
       img.src=data;
     },
@@ -317,17 +280,10 @@ function initSignature(){
       currentDoc.signature="";
     }
   };
-
-  $("#btnSigClear").onclick = ()=>sig.clear();
+  $("#btnSigClear").onclick=()=>sig.clear();
 }
 
-/* ================= SCHLIESSEN ================= */
-$("#btnClose").onclick = ()=>{
-  showPanel("documents");
-  renderDocs();
-};
-
-/* ================= INIT ================= */
+/* ================= UI ================= */
 function showPanel(id){
   $$(".panel").forEach(p=>p.classList.remove("is-active"));
   document.getElementById(id).classList.add("is-active");
