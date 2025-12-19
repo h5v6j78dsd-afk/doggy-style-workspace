@@ -1,213 +1,34 @@
-/* =========================================================
-   Doggy Style Workspace – FINAL styles.css (HERO FIX)
-========================================================= */
-
-* {
-  box-sizing: border-box;
-  -webkit-tap-highlight-color: transparent;
-}
-
-html, body {
-  margin: 0;
-  padding: 0;
-  background: #0f1115;
-  color: #e9edf1;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-               Roboto, Helvetica, Arial, sans-serif;
-}
-
-/* ================= HERO / LOGO ================= */
-
-/* Hero standardmäßig AUS */
-.hero,
-.header,
-.logo {
-  display: none;
-}
-
-/* Nur auf Startseite sichtbar */
-#home.is-active ~ .hero,
-#home.is-active ~ .header,
-#home.is-active ~ .logo {
-  display: block;
-  position: relative;
-  z-index: 1;
-}
-
-/* ================= LAYOUT ================= */
-
-.shell {
-  max-width: 980px;
-  margin: 16px auto 90px;
-  padding: 0 14px;
-  position: relative;
-  z-index: 5;
-}
-
-/* ================= NAVIGATION ================= */
-
-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(20,22,28,.92);
-  backdrop-filter: blur(12px);
-  display: flex;
-  justify-content: space-around;
-  border-top: 1px solid rgba(255,255,255,.08);
-  z-index: 50;
-}
-
-.tab {
-  flex: 1;
-  padding: 10px 0;
-  text-align: center;
-  font-size: 13px;
-  color: #8e95a3;
-  cursor: pointer;
-}
-
-.tab.is-active {
-  color: #fff;
-  font-weight: 600;
-}
-
-/* ================= PANELS (IOS SAFE) ================= */
-
-.panel {
-  visibility: hidden;
-  position: absolute;
-  inset: 0;
-  height: auto;
-  z-index: 10;
-}
-
-.panel.is-active {
-  visibility: visible;
-  position: relative;
-}
-
-/* ================= HEADINGS ================= */
-
-h1, h2 {
-  font-weight: 600;
-  margin: 16px 0 10px;
-}
-
-h1 { font-size: 20px; }
-h2 { font-size: 16px; }
-
-/* ================= CARDS ================= */
-
-.card {
-  background: rgba(255,255,255,.06);
-  border-radius: 14px;
-  padding: 14px;
-  margin-bottom: 14px;
-  border: 1px solid rgba(255,255,255,.08);
-}
-
-/* ================= FORM ================= */
-
-.field {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 12px;
-}
-
-.field span {
-  font-size: 13px;
-  opacity: .85;
-  margin-bottom: 4px;
-}
-
-.field input,
-.field select,
-.field textarea {
-  background: rgba(0,0,0,.35);
-  border: 1px solid rgba(255,255,255,.15);
-  border-radius: 10px;
-  padding: 10px;
-  color: #fff;
-  font-size: 15px;
-}
-
-.field textarea {
-  min-height: 70px;
-  resize: vertical;
-}
-
-/* ================= LISTS ================= */
-
-.item {
-  background: rgba(255,255,255,.05);
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.item small {
-  opacity: .75;
-  display: block;
-  font-size: 12px;
-}
-
-/* ================= BUTTONS ================= */
-
-button {
-  background: linear-gradient(135deg, #ff7a18, #ff9f1c);
-  border: none;
-  border-radius: 12px;
-  padding: 12px 16px;
-  color: #000;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-button.smallbtn {
-  padding: 8px 12px;
-  font-size: 13px;
-}
-
-button:disabled {
-  opacity: .4;
-}
-
-/* ================= SIGNATURE ================= */
-
-#sigPad {
-  width: 100%;
-  height: 160px;
-  border-radius: 12px;
-  background: #fff;
-  touch-action: none;
-}
-
-/* ================= MISC ================= */
-
-.muted {
-  opacity: .6;
-  font-size: 14px;
-}
-
-/* ================= PRINT ================= */
-
-.print-mode nav {
-  display: none;
-}
-
-@media print {
-  body {
-    background: #fff;
-    color: #000;
-  }
-  .card {
-    background: #fff;
-    border: 1px solid #000;
-  }
-}
+:root{--card:rgba(255,255,255,.10);--stroke:rgba(255,255,255,.16);--text:#f3f3f6;--muted:rgba(243,243,246,.72);--accent:#ffcc66;--danger:#ff5a5f;--shadow:0 18px 60px rgba(0,0,0,.35);--radius:18px}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;font-family:ui-rounded,system-ui,-apple-system,"SF Pro Display","Avenir Next",Arial,sans-serif;color:var(--text);
+background:radial-gradient(900px 600px at 20% 0%, rgba(255,204,102,.18), transparent 60%),radial-gradient(900px 600px at 90% 10%, rgba(120,180,255,.18), transparent 60%),linear-gradient(180deg,#0c0c10 0%,#12131b 100%)}
+.topbar{position:sticky;top:0;z-index:10;padding:14px 14px 10px;background:rgba(12,12,16,.70);backdrop-filter:blur(14px);border-bottom:1px solid rgba(255,255,255,.08)}
+.brand{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+.brand__logo{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.08);padding:6px;object-fit:contain}
+.brand__title{font-weight:800;font-size:16px}
+.brand__sub{color:var(--muted);font-size:12px;margin-top:2px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tab{border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.06);color:var(--text);padding:10px 12px;border-radius:999px;cursor:pointer;font-weight:650}
+.tab.is-active{border-color:rgba(255,204,102,.35);background:rgba(255,204,102,.12)}
+.shell{max-width:980px;margin:16px auto;padding:0 14px 60px}
+.panel{display:none}.panel.is-active{display:block}
+.card{background:var(--card);border:1px solid var(--stroke);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-bottom:14px;backdrop-filter:blur(14px)}
+.card h1{margin:0 0 12px}.card h2{margin:0 0 10px}.muted{color:var(--muted);font-size:13px}
+.hint{margin-top:10px;color:var(--muted);font-size:13px}
+.row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}.row.between{justify-content:space-between;align-items:center}
+.field{display:flex;flex-direction:column;gap:6px;min-width:240px;flex:1}
+.field span{font-size:12px;color:var(--muted);font-weight:700}
+input,select,textarea{width:100%;padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:rgba(10,10,14,.55);color:var(--text);outline:none}
+textarea{min-height:88px;resize:vertical}
+.btn{padding:12px 14px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);color:var(--text);cursor:pointer;font-weight:750}
+.btn.primary{background:rgba(255,204,102,.18);border-color:rgba(255,204,102,.35)}
+.btn.danger{background:rgba(255,90,95,.14);border-color:rgba(255,90,95,.35)}
+.list{display:flex;flex-direction:column;gap:10px}
+.item{padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.item small{display:block;color:var(--muted);margin-top:4px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.smallbtn{padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);color:var(--text);cursor:pointer;font-weight:700}
+.sigWrap{display:flex;flex-direction:column;gap:10px}
+#sigPad{width:100%;height:auto;border-radius:16px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.95);touch-action:none}
+.sticky{position:sticky;top:122px;z-index:9}
+.footer{position:fixed;bottom:0;left:0;right:0;padding:10px 14px;background:rgba(12,12,16,.70);border-top:1px solid rgba(255,255,255,.08);backdrop-filter:blur(14px);color:var(--muted);font-size:12px}
