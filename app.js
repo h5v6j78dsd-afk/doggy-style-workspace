@@ -12,15 +12,12 @@ const uid = () => Math.random().toString(16).slice(2) + Date.now().toString(16);
 
 /* ---------- State ---------- */
 function loadState(){
-  try{
+  try {
     return JSON.parse(localStorage.getItem(LS_KEY)) || { dogs: [], docs: [] };
-  }catch{
+  } catch (e) {
     return { dogs: [], docs: [] };
+  }
 }
-function saveState(){
-  localStorage.setItem(LS_KEY, JSON.stringify(state));
-}
-const state = loadState();
 
 /* =========================================================
    TEMPLATES (große Hundeannahme + Urlaub)
