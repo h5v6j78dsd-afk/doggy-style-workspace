@@ -1,14 +1,15 @@
 /* =========================================================
-   Doggy Style Workspace – STUFE 1
-   Dokument öffnen · bearbeiten · speichern · erneut öffnen
+   Doggy Style Workspace – STUFE 2
+   Dokument + Hund/Kunde-Zuordnung
 ========================================================= */
 
-const LS_KEY = "ds_stage1_state";
+const LS_KEY = "ds_stage2_state";
 
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 
 let state = JSON.parse(localStorage.getItem(LS_KEY)) || {
+  dogs: [],
   docs: []
 };
 
@@ -25,6 +26,7 @@ $$(".tab").forEach(btn=>{
     document.getElementById(btn.dataset.tab).classList.add("is-active");
 
     if(btn.dataset.tab==="documents") renderDocs();
+    if(btn.dataset.tab==="dogs") renderDogs();
   };
 });
 
@@ -38,12 +40,53 @@ $("#btnNewDoc").onclick = ()=>{
     id: Date.now().toString(),
     title: "Neues Dokument",
     text: "",
+    dogId: "",
     updatedAt: Date.now()
   };
   state.docs.unshift(doc);
   save();
   openDoc(doc.id);
 };
+
+/* ================= HUNDE / KUNDEN ================= */
+$("#btnAddDog").onclick = ()=>{
+  const name = prompt("Name des Hundes:");
+  if(!name) return;
+  const owner = prompt("Name Halter:");
+  const phone = prompt("Telefon:");
+
+  state.dogs.push({
+    id: Date.now().toString(),
+    name,
+    owner,
+    phone
+  });
+
+  save();
+  renderDogs();
+};
+
+function renderDogs(){
+  const list = $("#dogList");
+  list.innerHTML = "";
+
+  if(!state.dogs.length){
+    list.innerHTML = "<div class='muted'>Noch keine Hunde/Kunden.</div>";
+    return;
+  }
+
+  state.dogs.forEach(d=>{
+    const el = document.createElement("div");
+    el.className = "item";
+    el.innerHTML = `
+      <div>
+        <strong>${d.name}</strong>
+        <small>${d.owner || ""} · ${d.phone || ""}</small>
+      </div>
+    `;
+    list.appendChild(el);
+  });
+}
 
 /* ================= DOKUMENTE ================= */
 function renderDocs(){
@@ -56,12 +99,16 @@ function renderDocs(){
   }
 
   state.docs.forEach(d=>{
+    const dog = state.dogs.find(x=>x.id===d.dogId);
     const el = document.createElement("div");
     el.className = "item";
     el.innerHTML = `
       <div>
         <strong>${d.title}</strong>
-        <small>${new Date(d.updatedAt).toLocaleString("de-DE")}</small>
+        <small>
+          ${dog ? "🐕 " + dog.name + " · " : ""}
+          ${new Date(d.updatedAt).toLocaleString("de-DE")}
+        </small>
       </div>
       <div class="actions">
         <button class="smallbtn">Öffnen</button>
@@ -86,6 +133,24 @@ function openDoc(id){
   const root = $("#formRoot");
   root.innerHTML = "";
 
+  // Hund/Kunde Auswahl
+  const dogCard = document.createElement("div");
+  dogCard.className = "card";
+  dogCard.innerHTML = "<h2>Hund / Kunde</h2>";
+
+  const sel = document.createElement("select");
+  sel.innerHTML =
+    `<option value="">– bitte auswählen –</option>` +
+    state.dogs.map(d=>`<option value="${d.id}">${d.name} (${d.owner||""})</option>`).join("");
+  sel.value = currentDoc.dogId;
+  sel.onchange = ()=>{
+    currentDoc.dogId = sel.value;
+  };
+
+  dogCard.appendChild(sel);
+  root.appendChild(dogCard);
+
+  // Dokumentinhalt
   const card = document.createElement("div");
   card.className = "card";
   card.innerHTML = `
@@ -117,7 +182,7 @@ $("#btnClose").onclick = ()=>{
 
 /* ================= PRINT (Dummy) ================= */
 $("#btnPrint").onclick = ()=>{
-  alert("PDF/Druck kommt in Stufe 5 🙂");
+  alert("PDF/Druck kommt später 🙂");
 };
 
 /* ================= INIT ================= */
@@ -127,4 +192,5 @@ function showPanel(id){
 }
 
 showPanel("home");
+renderDogs();
 renderDocs();
