@@ -4,20 +4,27 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Doggy Style Workspace</title>
+
+  <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#101014" />
   <link rel="apple-touch-icon" href="assets/logo.png" />
+
+  <!-- Styles -->
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+
+  <!-- ================= TOPBAR ================= -->
   <header class="topbar">
     <div class="brand">
       <img src="assets/logo.png" alt="Doggy Style" class="brand__logo" />
-      <div class="brand__text">
+      <div>
         <div class="brand__title">Doggy Style Workspace</div>
-        <div class="brand__sub">Formularmappe · Offline · iPad‑freundlich</div>
+        <div class="brand__sub">Formulare · Offline · iPad-optimiert</div>
       </div>
     </div>
+
     <nav class="tabs" role="tablist">
       <button class="tab is-active" data-tab="home">Start</button>
       <button class="tab" data-tab="documents">Dokumente</button>
@@ -26,20 +33,30 @@
     </nav>
   </header>
 
+  <!-- ================= MAIN ================= -->
   <main class="shell">
+
+    <!-- ===== START ===== -->
     <section class="panel is-active" id="home">
       <div class="card hero">
         <h1>Neues Dokument</h1>
-        <p>Wähle eine Vorlage, fülle aus, unterschreibe – und speichere als PDF über „Drucken“.</p>
+        <p class="muted">
+          Vorlage auswählen, ausfüllen, unterschreiben und als PDF archivieren.
+        </p>
+
         <div class="row">
           <label class="field">
             <span>Vorlage</span>
             <select id="templateSelect"></select>
           </label>
-          <button class="btn primary" id="btnNewDoc">Dokument erstellen</button>
+          <button class="btn primary" id="btnNewDoc">
+            Dokument erstellen
+          </button>
         </div>
+
         <div class="hint">
-          <strong>Tipp:</strong> Installiere die App als PWA: In Safari <em>Teilen → Zum Home‑Bildschirm</em>.
+          <strong>Tipp:</strong>
+          Safari → Teilen → <em>Zum Home-Bildschirm</em> für Offline-Nutzung.
         </div>
       </div>
 
@@ -49,40 +66,56 @@
       </div>
     </section>
 
+    <!-- ===== DOKUMENTE ===== -->
     <section class="panel" id="documents">
       <div class="card">
         <div class="row between">
           <h1>Dokumente</h1>
-          <button class="btn" id="btnExportAll">Export: Backup (JSON)</button>
+          <button class="btn" id="btnExportAll">
+            Backup exportieren (JSON)
+          </button>
         </div>
         <div id="docList" class="list"></div>
       </div>
     </section>
 
+    <!-- ===== HUNDE / KUNDEN ===== -->
     <section class="panel" id="dogs">
       <div class="card">
         <div class="row between">
-          <h1>Hunde/Kunden</h1>
-          <button class="btn primary" id="btnAddDog">Neu anlegen</button>
+          <h1>Hunde / Kunden</h1>
+          <button class="btn primary" id="btnAddDog">
+            Neu anlegen
+          </button>
         </div>
         <div id="dogList" class="list"></div>
       </div>
     </section>
 
+    <!-- ===== EINSTELLUNGEN ===== -->
     <section class="panel" id="settings">
       <div class="card">
         <h1>Einstellungen</h1>
-        <p>Alles bleibt lokal auf deinem Gerät (Offline‑First).</p>
+        <p class="muted">
+          Alle Daten bleiben lokal auf diesem Gerät gespeichert.
+        </p>
+
         <div class="row">
-          <button class="btn danger" id="btnWipe">Alle lokalen Daten löschen</button>
+          <button class="btn danger" id="btnWipe">
+            Alle lokalen Daten löschen
+          </button>
         </div>
+
         <div class="hint">
-          PDFs archivierst du am besten in <strong>Dateien</strong> in einem Ordner z. B. <em>DoggyStyle/Docs</em>.
+          Für Backups regelmäßig <strong>Export (JSON)</strong> nutzen.
         </div>
       </div>
     </section>
 
+    <!-- ===== EDITOR (DOKUMENT) ===== -->
     <section class="panel" id="editor">
+
+      <!-- Sticky Kopf -->
       <div class="card sticky">
         <div class="row between">
           <div>
@@ -91,52 +124,60 @@
           </div>
           <div class="row">
             <button class="btn" id="btnSave">Speichern</button>
-            <button class="btn" id="btnPrint">Als PDF speichern (Drucken)</button>
+            <button class="btn" id="btnPrint">Als PDF speichern</button>
             <button class="btn" id="btnClose">Schließen</button>
           </div>
         </div>
       </div>
 
+      <!-- Dokument Meta -->
       <div class="card">
         <div class="row">
           <label class="field">
-            <span>Kunde/Halter</span>
-            <select id="dogSelect"></select>
-          </label>
-          <label class="field">
-            <span>Dokument‑Name</span>
+            <span>Dokument-Name</span>
             <input id="docName" type="text" placeholder="z.B. Hundeannahme_Müller_Bello" />
           </label>
         </div>
       </div>
 
+      <!-- Dynamisches Formular -->
       <div id="formRoot"></div>
 
+      <!-- Unterschrift -->
       <div class="card">
         <h2>Unterschrift</h2>
-        <p class="muted">Unterschreibe im Feld (Finger/Apple Pencil).</p>
+        <p class="muted">Bitte im Feld unterschreiben (Finger / Apple Pencil).</p>
+
         <div class="sigWrap">
-          <canvas id="sigPad" width="900" height="260"></canvas>
+          <canvas id="sigPad"></canvas>
           <div class="row">
             <button class="btn" id="btnSigClear">Unterschrift löschen</button>
           </div>
         </div>
       </div>
 
+      <!-- DSGVO -->
       <div class="card">
         <h2>Datenschutz (DSGVO)</h2>
         <p id="dsGvoText" class="muted"></p>
       </div>
+
     </section>
+
   </main>
 
+  <!-- ================= FOOTER ================= -->
   <footer class="footer">
-    <span>© Doggy Style Workspace · Offline‑PWA</span>
+    © Doggy Style Workspace · Offline-PWA
   </footer>
 
+  <!-- ================= SCRIPTS ================= -->
   <script src="app.js"></script>
   <script>
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
   </script>
+
 </body>
 </html>

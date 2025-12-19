@@ -1,12 +1,9 @@
 /* =========================================================
-   Doggy Style Workspace – FINAL KONSOLIDIERTE VERSION
-   - Hund/Kunde = zentrale Datenquelle
-   - stabile Unterschrift (iOS Canvas Fix)
-   - Kalender-Picker
-   - Kundenakte (Dokumente pro Hund)
+   Doggy Style Workspace – CORE APP (RESET VERSION)
+   passend zur neuen index.html
 ========================================================= */
 
-const LS_KEY = "ds_workspace_final_v2";
+const LS_KEY = "ds_workspace_core_v1";
 
 /* ---------- Helpers ---------- */
 const $ = s => document.querySelector(s);
@@ -19,7 +16,6 @@ function loadState(){
     return JSON.parse(localStorage.getItem(LS_KEY)) || { dogs: [], docs: [] };
   }catch{
     return { dogs: [], docs: [] };
-  }
 }
 function saveState(){
   localStorage.setItem(LS_KEY, JSON.stringify(state));
@@ -27,7 +23,7 @@ function saveState(){
 const state = loadState();
 
 /* =========================================================
-   TEMPLATES (Halterdaten kommen NICHT mehr hier vor!)
+   TEMPLATES (große Hundeannahme + Urlaub)
 ========================================================= */
 const templates = [
   {
@@ -42,7 +38,7 @@ zum Zweck der Betreuung meines Hundes verarbeitet und gespeichert werden.`,
         fields: [
           { key:"hund_name", label:"Name des Hundes", type:"text", required:true },
           { key:"hund_rasse", label:"Rasse", type:"text", required:true },
-          { key:"hund_alter", label:"Alter / Geburtsdatum", type:"text", required:true }
+          { key:"hund_geb", label:"Geburtsdatum / Alter", type:"date", required:true }
         ]
       },
       {
@@ -71,7 +67,7 @@ zum Zweck der Betreuung meines Hundes verarbeitet und gespeichert werden.`,
     dsGvoNote: "Datenschutz gemäß DSGVO.",
     sections: [
       {
-        title: "Zeitraum",
+        title: "Betreuungszeitraum",
         fields: [
           { key:"von", label:"Von", type:"date", required:true },
           { key:"bis", label:"Bis", type:"date", required:true }
@@ -91,18 +87,20 @@ function showPanel(id){
   $$(".panel").forEach(p => p.classList.remove("is-active"));
   $("#" + id)?.classList.add("is-active");
 }
+
 $$(".tab").forEach(btn=>{
-  btn.onclick=()=>{
-    $$(".tab").forEach(b=>b.classList.remove("is-active"));
+  btn.onclick = () => {
+    $$(".tab").forEach(b => b.classList.remove("is-active"));
     btn.classList.add("is-active");
     showPanel(btn.dataset.tab);
-    if(btn.dataset.tab==="documents") renderDocs();
-    if(btn.dataset.tab==="dogs") renderDogs();
+
+    if(btn.dataset.tab === "documents") renderDocs();
+    if(btn.dataset.tab === "dogs") renderDogs();
   };
 });
 
 /* =========================================================
-   Templates Select
+   Template-Auswahl
 ========================================================= */
 function initTemplates(){
   $("#templateSelect").innerHTML =
@@ -110,53 +108,69 @@ function initTemplates(){
 }
 
 /* =========================================================
-   Hunde / Kunden + Kundenakte
+   Hunde / Kunden
 ========================================================= */
-$("#btnAddDog").onclick=()=>{
+$("#btnAddDog").onclick = () => {
   const name = prompt("Name des Hundes:");
   if(!name) return;
   const owner = prompt("Name Halter:");
   const phone = prompt("Telefon:");
   state.dogs.push({ id: uid(), name, owner, phone });
-  saveState(); renderDogs();
+  saveState();
+  renderDogs();
 };
 
 function renderDogs(){
-  const list=$("#dogList"); list.innerHTML="";
+  const list = $("#dogList");
+  list.innerHTML = "";
+
   if(!state.dogs.length){
-    list.innerHTML="<div class='muted'>Noch keine Hunde/Kunden angelegt.</div>";
+    list.innerHTML = "<div class='muted'>Noch keine Hunde/Kunden angelegt.</div>";
     return;
   }
 
   state.dogs.forEach(d=>{
-    const docs = state.docs.filter(doc=>doc.dogId===d.id);
-    const el=document.createElement("div");
-    el.className="item";
-    el.innerHTML=`
+    const docs = state.docs.filter(doc => doc.dogId === d.id);
+    const el = document.createElement("div");
+    el.className = "item";
+    el.innerHTML = `
       <div>
         <strong>${d.name}</strong>
-        <small>${d.owner||""} · ${d.phone||""}</small>
+        <small>${d.owner || ""} · ${d.phone || ""}</small>
         ${docs.length ? `<div class="muted">Dokumente:</div>` : ""}
-        ${docs.map(doc=>`
-          <div class="muted">📄 ${doc.title}</div>
+        ${docs.map(doc => `
+          <div class="muted">
+            📄 <a href="#" data-doc="${doc.id}">${doc.title}</a>
+          </div>
         `).join("")}
       </div>
       <div class="actions">
-        <button class="smallbtn">✏️</button>
-        <button class="smallbtn">🗑️</button>
-      </div>`;
-    el.querySelectorAll("button")[0].onclick=()=>{
-      d.name=prompt("Name",d.name)||d.name;
-      d.owner=prompt("Halter",d.owner)||d.owner;
-      d.phone=prompt("Telefon",d.phone)||d.phone;
+        <button class="smallbtn" data-edit>✏️</button>
+        <button class="smallbtn" data-del>🗑️</button>
+      </div>
+    `;
+
+    el.querySelectorAll("[data-doc]").forEach(a=>{
+      a.onclick = e => {
+        e.preventDefault();
+        openDoc(a.dataset.doc);
+      };
+    });
+
+    el.querySelector("[data-edit]").onclick = ()=>{
+      d.name = prompt("Name", d.name) || d.name;
+      d.owner = prompt("Halter", d.owner) || d.owner;
+      d.phone = prompt("Telefon", d.phone) || d.phone;
       saveState(); renderDogs();
     };
-    el.querySelectorAll("button")[1].onclick=()=>{
+
+    el.querySelector("[data-del]").onclick = ()=>{
       if(confirm("Wirklich löschen?")){
-        state.dogs=state.dogs.filter(x=>x.id!==d.id);
+        state.dogs = state.dogs.filter(x=>x.id!==d.id);
         saveState(); renderDogs();
       }
     };
+
     list.appendChild(el);
   });
 }
@@ -164,144 +178,165 @@ function renderDogs(){
 /* =========================================================
    Dokumente
 ========================================================= */
-let currentDoc=null;
-let sig=null;
-let dirty=false;
+let currentDoc = null;
+let sig = null;
+let dirty = false;
 
-$("#btnNewDoc").onclick=()=>{
-  const tid=$("#templateSelect").value;
-  const t=templates.find(x=>x.id===tid);
-  const doc={
-    id:uid(),
-    templateId:t.id,
-    title:t.name,
-    dogId:"",
-    fields:{},
-    meta:{},
-    signature:"",
-    createdAt:Date.now(),
-    updatedAt:Date.now()
+$("#btnNewDoc").onclick = () => {
+  const tid = $("#templateSelect").value;
+  const t = templates.find(x=>x.id===tid);
+
+  const doc = {
+    id: uid(),
+    templateId: t.id,
+    title: t.name,
+    dogId: "",
+    fields: {},
+    meta: {},
+    signature: "",
+    createdAt: Date.now(),
+    updatedAt: Date.now()
   };
+
   state.docs.unshift(doc);
   saveState();
   openDoc(doc.id);
 };
 
 function renderDocs(){
-  const list=$("#docList"); list.innerHTML="";
+  const list = $("#docList");
+  list.innerHTML = "";
+
   if(!state.docs.length){
-    list.innerHTML="<div class='muted'>Noch keine Dokumente.</div>";
+    list.innerHTML = "<div class='muted'>Noch keine Dokumente.</div>";
     return;
   }
+
   state.docs.forEach(d=>{
-    const dt=new Date(d.updatedAt).toLocaleString("de-DE");
-    const dog=state.dogs.find(x=>x.id===d.dogId);
-    const el=document.createElement("div");
-    el.className="item";
-    el.innerHTML=`
+    const dog = state.dogs.find(x=>x.id===d.dogId);
+    const dt = new Date(d.updatedAt).toLocaleString("de-DE");
+
+    const el = document.createElement("div");
+    el.className = "item";
+    el.innerHTML = `
       <div>
         <strong>${d.title}</strong>
-        <small>${dog?dog.name+" · ":""}${dt}</small>
+        <small>${dog ? dog.name + " · " : ""}${dt}</small>
       </div>
       <div class="actions">
-        <button class="smallbtn">Öffnen</button>
-        <button class="smallbtn">🗑️</button>
-      </div>`;
-    el.querySelectorAll("button")[0].onclick=()=>openDoc(d.id);
-    el.querySelectorAll("button")[1].onclick=()=>{
+        <button class="smallbtn" data-open>Öffnen</button>
+        <button class="smallbtn" data-del>🗑️</button>
+      </div>
+    `;
+
+    el.querySelector("[data-open]").onclick = ()=>openDoc(d.id);
+    el.querySelector("[data-del]").onclick = ()=>{
       if(confirm("Dokument löschen?")){
-        state.docs=state.docs.filter(x=>x.id!==d.id);
+        state.docs = state.docs.filter(x=>x.id!==d.id);
         saveState(); renderDocs();
       }
     };
+
     list.appendChild(el);
   });
 }
 
+/* =========================================================
+   Dokument öffnen
+========================================================= */
 function openDoc(id){
-  currentDoc=state.docs.find(d=>d.id===id);
-  const t=templates.find(x=>x.id===currentDoc.templateId);
-  $("#editorTitle").textContent=currentDoc.title;
-  $("#editorMeta").textContent=t.name;
-  $("#docName").value=currentDoc.title;
+  currentDoc = state.docs.find(d=>d.id===id);
+  const t = templates.find(x=>x.id===currentDoc.templateId);
+
+  $("#editorTitle").textContent = currentDoc.title;
+  $("#editorMeta").textContent = t.name;
+  $("#docName").value = currentDoc.title;
+
   renderForm(t);
   initSig();
   if(currentDoc.signature) sig.from(currentDoc.signature);
-  $("#dsGvoText").textContent=t.dsGvoNote;
+
+  $("#dsGvoText").textContent = t.dsGvoNote;
   showPanel("editor");
 }
 
 /* =========================================================
-   Formular
+   Formular rendern
 ========================================================= */
 function renderForm(t){
-  const root=$("#formRoot"); root.innerHTML="";
+  const root = $("#formRoot");
+  root.innerHTML = "";
 
-  // Hund/Kunde Auswahl (Pflicht)
-  const dogCard=document.createElement("div");
-  dogCard.className="card";
-  dogCard.innerHTML="<h2>Hund / Kunde *</h2>";
-  const sel=document.createElement("select");
-  sel.innerHTML=`<option value="">– bitte auswählen –</option>`+
+  /* Hund/Kunde Pflicht */
+  const dogCard = document.createElement("div");
+  dogCard.className = "card";
+  dogCard.innerHTML = "<h2>Hund / Kunde *</h2>";
+  const sel = document.createElement("select");
+  sel.innerHTML = `<option value="">– bitte auswählen –</option>` +
     state.dogs.map(d=>`<option value="${d.id}">${d.name} (${d.owner||""})</option>`).join("");
-  sel.value=currentDoc.dogId;
-  sel.onchange=()=>{currentDoc.dogId=sel.value; dirty=true;};
+  sel.value = currentDoc.dogId;
+  sel.onchange = ()=>{ currentDoc.dogId = sel.value; dirty = true; };
   dogCard.appendChild(sel);
   root.appendChild(dogCard);
 
-  // Formularfelder
   t.sections.forEach(sec=>{
-    const c=document.createElement("div");
-    c.className="card";
-    c.innerHTML=`<h2>${sec.title}</h2>`;
+    const c = document.createElement("div");
+    c.className = "card";
+    c.innerHTML = `<h2>${sec.title}</h2>`;
+
     sec.fields.forEach(f=>{
-      const l=document.createElement("label");
-      l.className="field";
-      l.innerHTML=`<span>${f.label}${f.required?" *":""}</span>`;
+      const l = document.createElement("label");
+      l.className = "field";
+      l.innerHTML = `<span>${f.label}${f.required?" *":""}</span>`;
       let i;
-      if(f.type==="textarea") i=document.createElement("textarea");
+      if(f.type === "textarea") i = document.createElement("textarea");
       else{
-        i=document.createElement("input");
-        i.type=f.type||"text";
+        i = document.createElement("input");
+        i.type = f.type || "text";
       }
-      i.dataset.key=f.key;
-      if(f.type==="checkbox") i.checked=!!currentDoc.fields[f.key];
-      else i.value=currentDoc.fields[f.key]||"";
-      i.oninput=()=>dirty=true;
-      i.onchange=()=>dirty=true;
-      l.appendChild(i); c.appendChild(l);
+      i.dataset.key = f.key;
+      i.required = !!f.required;
+
+      if(f.type === "checkbox") i.checked = !!currentDoc.fields[f.key];
+      else i.value = currentDoc.fields[f.key] || "";
+
+      i.oninput = ()=>dirty = true;
+      i.onchange = ()=>dirty = true;
+
+      l.appendChild(i);
+      c.appendChild(l);
     });
+
     root.appendChild(c);
   });
 
-  // Meta
-  const meta=document.createElement("div");
-  meta.className="card";
-  meta.innerHTML="<h2>Ort / Datum *</h2>";
-  const m=document.createElement("input");
-  m.type="date";
-  m.value=currentDoc.meta.ort_datum||"";
-  m.oninput=()=>dirty=true;
-  m.dataset.key="ort_datum";
+  const meta = document.createElement("div");
+  meta.className = "card";
+  meta.innerHTML = "<h2>Ort / Datum *</h2>";
+  const m = document.createElement("input");
+  m.type = "date";
+  m.value = currentDoc.meta.ort_datum || "";
+  m.oninput = ()=>dirty = true;
+  m.dataset.key = "ort_datum";
+  m.required = true;
   meta.appendChild(m);
   root.appendChild(meta);
 }
 
 /* =========================================================
-   Validierung & Speichern
+   Speichern + Validierung
 ========================================================= */
-$("#btnSave").onclick=()=>{
-  const t=templates.find(x=>x.id===currentDoc.templateId);
-  const missing=[];
+$("#btnSave").onclick = ()=>{
+  const missing = [];
 
-  if(!currentDoc.dogId) missing.push("Hund/Kunde");
+  if(!currentDoc.dogId) missing.push("Hund / Kunde");
 
   $$("#formRoot [data-key]").forEach(i=>{
-    if(i.type==="checkbox"){
-      currentDoc.fields[i.dataset.key]=i.checked;
+    if(i.type === "checkbox"){
+      currentDoc.fields[i.dataset.key] = i.checked;
       if(i.required && !i.checked) missing.push(i.previousSibling.textContent);
     }else{
-      currentDoc.fields[i.dataset.key]=i.value;
+      currentDoc.fields[i.dataset.key] = i.value;
       if(i.required && !i.value) missing.push(i.previousSibling.textContent);
     }
   });
@@ -309,65 +344,88 @@ $("#btnSave").onclick=()=>{
   if(!currentDoc.signature) missing.push("Unterschrift");
 
   if(missing.length){
-    alert("Bitte noch ausfüllen:\n\n• "+[...new Set(missing)].join("\n• "));
+    alert("Bitte noch ausfüllen:\n\n• " + [...new Set(missing)].join("\n• "));
     return;
   }
 
-  currentDoc.title=$("#docName").value||currentDoc.title;
-  currentDoc.updatedAt=Date.now();
+  currentDoc.title = $("#docName").value || currentDoc.title;
+  currentDoc.updatedAt = Date.now();
   saveState();
-  dirty=false;
+  dirty = false;
   alert("Gespeichert ✅");
 };
 
 /* =========================================================
-   Unterschrift – stabil (iOS Fix)
+   Unterschrift (stabil)
 ========================================================= */
 function initSig(){
-  const c=$("#sigPad"),ctx=c.getContext("2d");
-  const resize=()=>{
-    const r=c.getBoundingClientRect(),d=window.devicePixelRatio||1;
-    c.width=r.width*d; c.height=r.height*d;
+  const c = $("#sigPad");
+  const ctx = c.getContext("2d");
+
+  function resize(){
+    const r = c.getBoundingClientRect();
+    const d = window.devicePixelRatio || 1;
+    c.width = r.width * d;
+    c.height = r.height * d;
     ctx.setTransform(d,0,0,d,0,0);
-    ctx.fillStyle="#fff"; ctx.fillRect(0,0,r.width,r.height);
-    ctx.strokeStyle="#111"; ctx.lineWidth=2.5; ctx.lineCap="round";
-  };
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0,0,r.width,r.height);
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+  }
+
   resize();
-  let draw=false,last=null;
-  const pos=e=>{const b=c.getBoundingClientRect();return{x:e.clientX-b.left,y:e.clientY-b.top}};
-  c.onpointerdown=e=>{c.setPointerCapture(e.pointerId);draw=true;last=pos(e);dirty=true};
-  c.onpointermove=e=>{
-    if(!draw)return;
-    const p=pos(e);
-    ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke();
-    last=p;
+  let draw = false, last = null;
+
+  const pos = e => {
+    const b = c.getBoundingClientRect();
+    return { x: e.clientX - b.left, y: e.clientY - b.top };
   };
-  c.onpointerup=()=>{
-    draw=false;
-    currentDoc.signature=c.toDataURL("image/png");
+
+  c.onpointerdown = e=>{
+    c.setPointerCapture(e.pointerId);
+    draw = true;
+    last = pos(e);
+    dirty = true;
   };
-  sig={
-    from:u=>{
-      const img=new Image();
-      img.onload=()=>{
+  c.onpointermove = e=>{
+    if(!draw) return;
+    const p = pos(e);
+    ctx.beginPath();
+    ctx.moveTo(last.x,last.y);
+    ctx.lineTo(p.x,p.y);
+    ctx.stroke();
+    last = p;
+  };
+  c.onpointerup = ()=>{
+    draw = false;
+    currentDoc.signature = c.toDataURL("image/png");
+  };
+
+  sig = {
+    from: url=>{
+      const img = new Image();
+      img.onload = ()=>{
         resize();
-        ctx.drawImage(img,0,0,c.width/c.devicePixelRatio,c.height/c.devicePixelRatio);
+        ctx.drawImage(img,0,0,c.width/(window.devicePixelRatio||1),c.height/(window.devicePixelRatio||1));
       };
-      img.src=u;
+      img.src = url;
     },
-    clear:()=>{
+    clear: ()=>{
       resize();
-      currentDoc.signature="";
+      currentDoc.signature = "";
     }
   };
-  $("#btnSigClear").onclick=()=>sig.clear();
+
+  $("#btnSigClear").onclick = ()=>sig.clear();
 }
 
 /* =========================================================
-   PDF / Schließen
+   Drucken / Schließen
 ========================================================= */
-$("#btnPrint").onclick=()=>window.print();
-$("#btnClose").onclick=()=>{
+$("#btnPrint").onclick = ()=>window.print();
+$("#btnClose").onclick = ()=>{
   if(dirty && !confirm("Änderungen verwerfen?")) return;
   showPanel("documents");
   renderDocs();
@@ -376,17 +434,18 @@ $("#btnClose").onclick=()=>{
 /* =========================================================
    Einstellungen & Export
 ========================================================= */
-$("#btnWipe").onclick=()=>{
+$("#btnWipe").onclick = ()=>{
   if(confirm("Alle lokalen Daten löschen?")){
     localStorage.removeItem(LS_KEY);
     location.reload();
   }
 };
-$("#btnExportAll").onclick=()=>{
-  const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="DoggyStyle_Backup.json";
+
+$("#btnExportAll").onclick = ()=>{
+  const blob = new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "DoggyStyle_Backup.json";
   a.click();
   URL.revokeObjectURL(a.href);
 };
