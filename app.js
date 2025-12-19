@@ -1,6 +1,7 @@
 /* =========================================================
-   Doggy Style Workspace – FINAL OPTION B (STABIL + FIX)
+   Doggy Style Workspace – FINAL OPTION B (ENDGÜLTIG)
    ✔ Keine toten Dokumente
+   ✔ Editor unabhängig von Tabs
 ========================================================= */
 
 const LS_KEY = "ds_option_b_final";
@@ -17,7 +18,7 @@ function save(){
   localStorage.setItem(LS_KEY, JSON.stringify(state));
 }
 
-/* ================= NAVIGATION ================= */
+/* ================= NAVIGATION (NUR HAUPTSEITEN) ================= */
 function activateTab(tabId){
   $$(".tab").forEach(b=>b.classList.remove("is-active"));
   const btn = document.querySelector(`.tab[data-tab="${tabId}"]`);
@@ -33,6 +34,17 @@ function activateTab(tabId){
 $$(".tab").forEach(btn=>{
   btn.onclick=()=>activateTab(btn.dataset.tab);
 });
+
+/* ================= EDITOR STEUERUNG ================= */
+function showEditor(){
+  $$(".panel").forEach(p=>p.classList.remove("is-active"));
+  document.getElementById("editor").classList.add("is-active");
+}
+
+function closeEditor(){
+  currentDoc = null;
+  activateTab("documents");
+}
 
 /* ================= START ================= */
 $("#templateSelect").innerHTML = `
@@ -54,9 +66,7 @@ $("#btnNewDoc").onclick = ()=>{
   state.docs.unshift(doc);
   save();
 
-  // 🔑 WICHTIG: Navigation & Editor explizit setzen
-  activateTab("documents");
-  openDoc(doc.id);
+  openDoc(doc.id);   // 👈 DIREKT IN DEN EDITOR
 };
 
 /* ================= HUNDE / KUNDEN ================= */
@@ -112,10 +122,7 @@ function renderDocs(){
       </div>
       <button class="smallbtn">Öffnen</button>
     `;
-    el.querySelector("button").onclick=()=>{
-      activateTab("documents");
-      openDoc(d.id);
-    };
+    el.querySelector("button").onclick=()=>openDoc(d.id);
     list.appendChild(el);
   });
 }
@@ -136,16 +143,13 @@ function openDoc(id){
   initSignature();
   if(currentDoc.signature) sig.load(currentDoc.signature);
 
-  activateTab("editor");
+  showEditor();   // 👈 EINZIGER WEG IN DEN EDITOR
 }
 
 /* ================= SCHLIESSEN ================= */
 const btnClose = $("#btnClose");
 if(btnClose){
-  btnClose.onclick = ()=>{
-    currentDoc = null;
-    activateTab("documents");
-  };
+  btnClose.onclick = closeEditor;
 }
 
 /* ================= INIT ================= */
