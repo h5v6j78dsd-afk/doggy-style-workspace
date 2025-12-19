@@ -1,6 +1,6 @@
 /* =========================================================
-   Doggy Style Workspace – FINAL OPTION B (STABIL)
-   Schließen-Button aktiv – OHNE Backup-Funktion
+   Doggy Style Workspace – FINAL OPTION B (STABIL + FIX)
+   ✔ Keine toten Dokumente
 ========================================================= */
 
 const LS_KEY = "ds_option_b_final";
@@ -18,16 +18,20 @@ function save(){
 }
 
 /* ================= NAVIGATION ================= */
-$$(".tab").forEach(btn=>{
-  btn.onclick=()=>{
-    $$(".tab").forEach(b=>b.classList.remove("is-active"));
-    btn.classList.add("is-active");
-    $$(".panel").forEach(p=>p.classList.remove("is-active"));
-    document.getElementById(btn.dataset.tab).classList.add("is-active");
+function activateTab(tabId){
+  $$(".tab").forEach(b=>b.classList.remove("is-active"));
+  const btn = document.querySelector(`.tab[data-tab="${tabId}"]`);
+  if(btn) btn.classList.add("is-active");
 
-    if(btn.dataset.tab==="documents") renderDocs();
-    if(btn.dataset.tab==="dogs") renderDogs();
-  };
+  $$(".panel").forEach(p=>p.classList.remove("is-active"));
+  document.getElementById(tabId).classList.add("is-active");
+
+  if(tabId==="documents") renderDocs();
+  if(tabId==="dogs") renderDogs();
+}
+
+$$(".tab").forEach(btn=>{
+  btn.onclick=()=>activateTab(btn.dataset.tab);
 });
 
 /* ================= START ================= */
@@ -46,8 +50,12 @@ $("#btnNewDoc").onclick = ()=>{
     createdAt: Date.now(),
     updatedAt: Date.now()
   };
+
   state.docs.unshift(doc);
   save();
+
+  // 🔑 WICHTIG: Navigation & Editor explizit setzen
+  activateTab("documents");
   openDoc(doc.id);
 };
 
@@ -104,7 +112,10 @@ function renderDocs(){
       </div>
       <button class="smallbtn">Öffnen</button>
     `;
-    el.querySelector("button").onclick=()=>openDoc(d.id);
+    el.querySelector("button").onclick=()=>{
+      activateTab("documents");
+      openDoc(d.id);
+    };
     list.appendChild(el);
   });
 }
@@ -125,37 +136,19 @@ function openDoc(id){
   initSignature();
   if(currentDoc.signature) sig.load(currentDoc.signature);
 
-  showPanel("editor");
+  activateTab("editor");
 }
-
-/* ================= FORMULAR ================= */
-/* (kompletter Option-B-Formularcode bleibt unverändert) */
-
-/* ================= SPEICHERN ================= */
-/* (unverändert – Pflichtfelder & Sperre bleiben aktiv) */
-
-/* ================= PDF ================= */
-/* (unverändert – iOS-safe) */
-
-/* ================= SIGNATUR ================= */
-/* (unverändert – Sperre nach Speichern) */
 
 /* ================= SCHLIESSEN ================= */
 const btnClose = $("#btnClose");
 if(btnClose){
   btnClose.onclick = ()=>{
     currentDoc = null;
-    showPanel("documents");
-    renderDocs();
+    activateTab("documents");
   };
 }
 
-/* ================= UI ================= */
-function showPanel(id){
-  $$(".panel").forEach(p=>p.classList.remove("is-active"));
-  document.getElementById(id).classList.add("is-active");
-}
-
-showPanel("home");
+/* ================= INIT ================= */
+activateTab("home");
 renderDogs();
 renderDocs();
