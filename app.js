@@ -1,6 +1,6 @@
 /* =========================================================
    Doggy Style Workspace – FINAL FIX
-   Rechtssicherer Editor + PDF sauber getrennt
+   Rechtssicherer Editor + PDF + Signatur-Sperre
 ========================================================= */
 
 const LS_KEY = "ds_final_fix";
@@ -42,6 +42,7 @@ $("#btnNewDoc").onclick = ()=>{
     dogId: "",
     fields: {},
     signature: "",
+    locked: false,               // 🔒 NEU
     updatedAt: Date.now()
   };
   state.docs.unshift(doc);
@@ -94,7 +95,11 @@ function renderDocs(){
     el.innerHTML=`
       <div>
         <strong>${d.title}</strong>
-        <small>${dog?"🐕 "+dog.name+" · ":""}${new Date(d.updatedAt).toLocaleString("de-DE")}</small>
+        <small>
+          ${dog?"🐕 "+dog.name+" · ":""}
+          ${new Date(d.updatedAt).toLocaleString("de-DE")}
+          ${d.locked ? " · 🔒 abgeschlossen" : ""}
+        </small>
       </div>
       <button class="smallbtn">Öffnen</button>
     `;
@@ -123,12 +128,11 @@ function openDoc(id){
   showPanel("editor");
 }
 
-/* ================= EDITOR-FORM (RECHTSSICHER) ================= */
+/* ================= EDITOR-FORM ================= */
 function renderEditorForm(){
   const root=$("#formRoot");
   root.innerHTML="";
 
-  // Hund/Kunde
   const card=document.createElement("div");
   card.className="card";
   card.innerHTML="<h2>Halter / Hund *</h2>";
@@ -138,6 +142,7 @@ function renderEditorForm(){
     state.dogs.map(d=>`<option value="${d.id}">${d.name} (${d.owner})</option>`).join("");
   sel.value=currentDoc.dogId;
   sel.onchange=()=>currentDoc.dogId=sel.value;
+
   card.appendChild(sel);
   root.appendChild(card);
 
@@ -189,7 +194,7 @@ function checkbox(key,label){
   return l;
 }
 
-/* ================= SPEICHERN (BLOCKIERT OHNE DATEN) ================= */
+/* ================= SPEICHERN ================= */
 $("#btnSave").onclick=()=>{
   const missing=[];
   if(!currentDoc.dogId) missing.push("Hund / Kunde");
@@ -208,8 +213,9 @@ $("#btnSave").onclick=()=>{
 
   currentDoc.title=$("#docName").value||currentDoc.title;
   currentDoc.updatedAt=Date.now();
+  currentDoc.locked=true;     // 🔒 NACH SPEICHERN SPERREN
   save();
-  alert("Gespeichert ✅");
+  alert("Gespeichert & abgeschlossen ✅");
 };
 
 /* ================= PDF ================= */
@@ -241,6 +247,13 @@ function initSignature(){
   }
   resize();
 
+  // 🔒 WENN GESPERRT → NICHT MEHR ZEICHNEN
+  if(currentDoc.locked){
+    c.style.pointerEvents="none";
+    $("#btnSigClear").style.display="none";
+    return;
+  }
+
   let draw=false,last=null;
   const pos=e=>{
     const b=c.getBoundingClientRect();
@@ -271,7 +284,12 @@ function initSignature(){
       const img=new Image();
       img.onload=()=>{
         resize();
-        ctx.drawImage(img,0,0,c.width/(window.devicePixelRatio||1),c.height/(window.devicePixelRatio||1));
+        ctx.drawImage(
+          img,
+          0,0,
+          c.width/(window.devicePixelRatio||1),
+          c.height/(window.devicePixelRatio||1)
+        );
       };
       img.src=data;
     },
