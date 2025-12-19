@@ -1,6 +1,6 @@
 /* =========================================================
-   Doggy Style Workspace – FINAL OPTION B + UI FIXES
-   Schließen-Button + Backup-Export (JSON)
+   Doggy Style Workspace – FINAL OPTION B (STABIL)
+   Schließen-Button aktiv – OHNE Backup-Funktion
 ========================================================= */
 
 const LS_KEY = "ds_option_b_final";
@@ -109,33 +109,6 @@ function renderDocs(){
   });
 }
 
-/* ================= BACKUP EXPORT ================= */
-const btnExport = $("#btnExportAll");
-if(btnExport){
-  btnExport.onclick = ()=>{
-    const data = {
-      exportedAt: new Date().toISOString(),
-      dogs: state.dogs,
-      docs: state.docs
-    };
-
-    const json = JSON.stringify(data, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
-
-    const d = new Date();
-    const name =
-      "doggy-style-backup_" +
-      d.toISOString().slice(0,16).replace(/[:T]/g,"-") +
-      ".json";
-
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
-}
-
 /* ================= EDITOR ================= */
 let currentDoc=null;
 let sig=null;
@@ -156,16 +129,16 @@ function openDoc(id){
 }
 
 /* ================= FORMULAR ================= */
-// (Formular-Code unverändert – identisch zu deiner Version)
+/* (kompletter Option-B-Formularcode bleibt unverändert) */
 
 /* ================= SPEICHERN ================= */
-// (unverändert)
+/* (unverändert – Pflichtfelder & Sperre bleiben aktiv) */
 
 /* ================= PDF ================= */
-// (unverändert)
+/* (unverändert – iOS-safe) */
 
 /* ================= SIGNATUR ================= */
-// (unverändert)
+/* (unverändert – Sperre nach Speichern) */
 
 /* ================= SCHLIESSEN ================= */
 const btnClose = $("#btnClose");
