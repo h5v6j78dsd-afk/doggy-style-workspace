@@ -11,9 +11,9 @@
   --shadow:0 18px 60px rgba(0,0,0,.35);
 }
 
-/* RESET */
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
+
 body{
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",system-ui,Arial,sans-serif;
   color:var(--text);
@@ -27,66 +27,41 @@ body{
 .topbar{
   position:sticky;
   top:0;
-  z-index:50;
+  z-index:10;
   padding:14px 14px 10px;
   background:rgba(12,12,16,.72);
   backdrop-filter:blur(14px);
   border-bottom:1px solid rgba(255,255,255,.08);
 }
 
-.brand{
-  display:flex;
-  gap:12px;
-  align-items:center;
-  margin-bottom:10px;
-}
-
+.brand{display:flex;gap:12px;align-items:center;margin-bottom:10px}
 .brand__logo{
-  width:44px;
-  height:44px;
-  border-radius:12px;
+  width:44px;height:44px;border-radius:12px;
   background:rgba(255,255,255,.12);
-  padding:6px;
-  object-fit:contain;
+  padding:6px;object-fit:contain
 }
+.brand__title{font-weight:800;font-size:16px}
+.brand__sub{font-size:12px;color:var(--muted)}
 
-.brand__title{
-  font-weight:800;
-  font-size:16px;
-}
-
-.brand__sub{
-  font-size:12px;
-  color:var(--muted);
-}
-
-/* TABS */
-.tabs{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-}
-
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
 .tab{
-  appearance:none;
   border:1px solid rgba(255,255,255,.12);
   background:rgba(255,255,255,.06);
   color:var(--text);
   padding:10px 14px;
   border-radius:999px;
-  cursor:pointer;
   font-weight:700;
+  cursor:pointer;
 }
-
 .tab.is-active{
-  background:rgba(255,204,102,.18);
-  border-color:rgba(255,204,102,.35);
+  background:rgba(255,204,102,.22);
+  border-color:rgba(255,204,102,.4);
 }
 
 /* LAYOUT */
 .shell{
   max-width:980px;
-  margin:16px auto 80px;
+  margin:16px auto 90px;
   padding:0 14px;
 }
 
@@ -107,55 +82,26 @@ body{
 .card h1{margin:0 0 12px;font-size:18px}
 .card h2{margin:0 0 10px;font-size:14px}
 
-.hero p{margin-top:0;color:var(--muted)}
-
 .muted{color:var(--muted);font-size:13px}
 .hint{margin-top:10px;color:var(--muted);font-size:13px}
 
-/* ROWS & FIELDS */
-.row{
-  display:flex;
-  gap:12px;
-  flex-wrap:wrap;
-  align-items:flex-end;
-}
+/* ROWS */
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.row.between{justify-content:space-between;align-items:center}
 
-.row.between{
-  justify-content:space-between;
-  align-items:center;
-}
+/* FIELDS */
+.field{display:flex;flex-direction:column;gap:6px;min-width:240px;flex:1}
+.field span{font-size:12px;font-weight:700;color:var(--muted)}
 
-.field{
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-  min-width:240px;
-  flex:1;
-}
-
-.field span{
-  font-size:12px;
-  font-weight:700;
-  color:var(--muted);
-}
-
-/* INPUTS */
-input,
-select,
-textarea{
+input,select,textarea{
   width:100%;
   padding:12px;
   border-radius:14px;
   border:1px solid rgba(255,255,255,.14);
   background:rgba(10,10,14,.55);
   color:var(--text);
-  outline:none;
 }
-
-textarea{
-  min-height:88px;
-  resize:vertical;
-}
+textarea{min-height:88px;resize:vertical}
 
 /* BUTTONS */
 .btn{
@@ -164,99 +110,76 @@ textarea{
   border:1px solid rgba(255,255,255,.16);
   background:rgba(255,255,255,.08);
   color:var(--text);
-  cursor:pointer;
   font-weight:800;
+  cursor:pointer;
 }
-
 .btn.primary{
   background:rgba(255,204,102,.22);
   border-color:rgba(255,204,102,.4);
 }
-
 .btn.danger{
-  background:rgba(255,90,95,.2);
+  background:rgba(255,90,95,.22);
   border-color:rgba(255,90,95,.4);
 }
 
 /* LISTS */
-.list{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-
+.list{display:flex;flex-direction:column;gap:10px}
 .item{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:10px;
-  padding:12px;
+  display:flex;justify-content:space-between;align-items:center;
+  gap:10px;padding:12px;
   border-radius:14px;
   background:rgba(255,255,255,.06);
   border:1px solid rgba(255,255,255,.12);
 }
-
-.item small{
-  display:block;
-  margin-top:4px;
-  color:var(--muted);
-}
-
-.actions{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-}
-
+.item small{display:block;margin-top:4px;color:var(--muted)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
 .smallbtn{
-  padding:10px 12px;
-  border-radius:12px;
+  padding:10px 12px;border-radius:12px;
   border:1px solid rgba(255,255,255,.16);
   background:rgba(255,255,255,.08);
   color:var(--text);
-  cursor:pointer;
   font-weight:700;
 }
 
-/* SIGNATURE */
-.sigWrap{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-
+/* SIGNATUR – iOS SAFE */
+.sigWrap{display:flex;flex-direction:column;gap:10px}
 #sigPad{
+  position:relative;
+  z-index:5;
+  pointer-events:auto;
+
   width:100%;
   aspect-ratio:3.5 / 1;
+
   background:#fff;
   border-radius:16px;
   border:1px solid rgba(255,255,255,.16);
   touch-action:none;
 }
+.sigWrap, .sigWrap *{pointer-events:auto}
 
 /* STICKY EDITOR BAR */
 .sticky{
   position:sticky;
   top:120px;
-  z-index:20;
+  z-index:2;
 }
 
-/* FOOTER */
+/* FOOTER – darf nichts blockieren */
 .footer{
   position:fixed;
-  left:0;
-  right:0;
-  bottom:0;
+  left:0;right:0;bottom:0;
   padding:10px 14px;
   background:rgba(12,12,16,.75);
   border-top:1px solid rgba(255,255,255,.08);
   backdrop-filter:blur(14px);
   font-size:12px;
   color:var(--muted);
+  z-index:1;
+  pointer-events:none;
 }
 
-/* MOBILE TWEAKS */
+/* MOBILE */
 @media (max-width:640px){
-  .brand__title{font-size:15px}
   .sticky{top:110px}
 }
