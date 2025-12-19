@@ -1,9 +1,9 @@
 /* =========================================================
-   Doggy Style Workspace – STUFE 4
-   Unterschrift (Canvas) stabil & persistent
+   Doggy Style Workspace – STUFE 5
+   PDF / Drucken (amtlich & archivfähig)
 ========================================================= */
 
-const LS_KEY = "ds_stage4_state";
+const LS_KEY = "ds_stage5_state";
 
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -135,94 +135,48 @@ function openDoc(id){
   showPanel("editor");
 }
 
-/* ================= FORMULAR (wie STUFE 3) ================= */
+/* ================= FORMULAR (wie STUFE 4) ================= */
 function renderForm(){
   const root = $("#formRoot");
   root.innerHTML = "";
 
-  const dogCard = document.createElement("div");
-  dogCard.className = "card";
-  dogCard.innerHTML = "<h2>Hund / Kunde *</h2>";
-  const sel = document.createElement("select");
-  sel.innerHTML =
-    `<option value="">– bitte auswählen –</option>` +
-    state.dogs.map(d=>`<option value="${d.id}">${d.name} (${d.owner||""})</option>`).join("");
-  sel.value = currentDoc.dogId;
-  sel.onchange = ()=> currentDoc.dogId = sel.value;
-  dogCard.appendChild(sel);
-  root.appendChild(dogCard);
+  const dog = state.dogs.find(d=>d.id===currentDoc.dogId);
 
-  addSection(root,"Angaben zum Hund",[
-    field("hund_name","Name des Hundes *"),
-    field("hund_rasse","Rasse *"),
-    field("hund_alter","Alter / Geburtsdatum *")
-  ]);
+  const info = document.createElement("div");
+  info.className = "card";
+  info.innerHTML = `
+    <h2>Halter / Hund</h2>
+    <p><strong>Hund:</strong> ${dog?.name||""}</p>
+    <p><strong>Halter:</strong> ${dog?.owner||""}</p>
+    <p><strong>Telefon:</strong> ${dog?.phone||""}</p>
+  `;
+  root.appendChild(info);
 
-  addSection(root,"Gesundheit",[
-    checkbox("impfung","Impfschutz vollständig *"),
-    field("krankheiten","Krankheiten / Besonderheiten")
-  ]);
-
-  addSection(root,"Haftung & Vereinbarung",[
-    checkbox("angaben_wahr","Angaben wahrheitsgemäß *"),
-    checkbox("agb","AGB gelesen & akzeptiert *")
-  ]);
-}
-
-function addSection(root,title,fields){
-  const c=document.createElement("div");
-  c.className="card";
-  c.innerHTML=`<h2>${title}</h2>`;
-  fields.forEach(f=>c.appendChild(f));
-  root.appendChild(c);
-}
-function field(key,label){
-  const l=document.createElement("label");
-  l.className="field";
-  l.innerHTML=`<span>${label}</span>`;
-  const i=document.createElement("input");
-  i.value=currentDoc.fields[key]||"";
-  i.oninput=()=>currentDoc.fields[key]=i.value;
-  l.appendChild(i);
-  return l;
-}
-function checkbox(key,label){
-  const l=document.createElement("label");
-  l.className="field";
-  l.innerHTML=`<span>${label}</span>`;
-  const i=document.createElement("input");
-  i.type="checkbox";
-  i.checked=!!currentDoc.fields[key];
-  i.onchange=()=>currentDoc.fields[key]=i.checked;
-  l.appendChild(i);
-  return l;
-}
-
-/* ================= SPEICHERN + VALIDIERUNG ================= */
-$("#btnSave").onclick = ()=>{
-  const missing=[];
-
-  if(!currentDoc.dogId) missing.push("Hund / Kunde");
-  if(!currentDoc.fields.hund_name) missing.push("Name des Hundes");
-  if(!currentDoc.fields.hund_rasse) missing.push("Rasse");
-  if(!currentDoc.fields.hund_alter) missing.push("Alter / Geburtsdatum");
-  if(!currentDoc.fields.impfung) missing.push("Impfschutz");
-  if(!currentDoc.fields.angaben_wahr) missing.push("Angaben wahrheitsgemäß");
-  if(!currentDoc.fields.agb) missing.push("AGB");
-  if(!currentDoc.signature) missing.push("Unterschrift");
-
-  if(missing.length){
-    alert("Bitte noch ausfüllen:\n\n• "+missing.join("\n• "));
-    return;
+  for(const key in currentDoc.fields){
+    const row=document.createElement("div");
+    row.className="print-row";
+    row.innerHTML=`<strong>${key}:</strong> ${currentDoc.fields[key]}`;
+    root.appendChild(row);
   }
+}
 
-  currentDoc.title = $("#docName").value || currentDoc.title;
+/* ================= SPEICHERN ================= */
+$("#btnSave").onclick = ()=>{
   currentDoc.updatedAt = Date.now();
   save();
   alert("Gespeichert ✅");
 };
 
-/* ================= UNTERSCHRIFT (Canvas) ================= */
+/* ================= DRUCKEN ================= */
+$("#btnPrint").onclick = ()=>{
+  document.body.classList.add("print-mode");
+  setTimeout(()=>{
+    window.print();
+    document.body.classList.remove("print-mode");
+  },300);
+};
+
+/* ================= UNTERSCHRIFT ================= */
 function initSignature(){
   const canvas = $("#sigPad");
   const ctx = canvas.getContext("2d");
@@ -233,58 +187,57 @@ function initSignature(){
     canvas.width = r.width * d;
     canvas.height = r.height * d;
     ctx.setTransform(d,0,0,d,0,0);
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle="#fff";
     ctx.fillRect(0,0,r.width,r.height);
-    ctx.strokeStyle = "#111";
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = "round";
+    ctx.strokeStyle="#111";
+    ctx.lineWidth=2.5;
+    ctx.lineCap="round";
   }
 
   resize();
 
-  let drawing = false;
-  let last = null;
+  let drawing=false,last=null;
 
-  const pos = e=>{
-    const b = canvas.getBoundingClientRect();
-    return { x: e.clientX - b.left, y: e.clientY - b.top };
+  const pos=e=>{
+    const b=canvas.getBoundingClientRect();
+    return {x:e.clientX-b.left,y:e.clientY-b.top};
   };
 
-  canvas.onpointerdown = e=>{
+  canvas.onpointerdown=e=>{
     canvas.setPointerCapture(e.pointerId);
-    drawing = true;
-    last = pos(e);
+    drawing=true;
+    last=pos(e);
   };
-  canvas.onpointermove = e=>{
+  canvas.onpointermove=e=>{
     if(!drawing) return;
-    const p = pos(e);
+    const p=pos(e);
     ctx.beginPath();
     ctx.moveTo(last.x,last.y);
     ctx.lineTo(p.x,p.y);
     ctx.stroke();
-    last = p;
+    last=p;
   };
-  canvas.onpointerup = ()=>{
-    drawing = false;
-    currentDoc.signature = canvas.toDataURL("image/png");
+  canvas.onpointerup=()=>{
+    drawing=false;
+    currentDoc.signature=canvas.toDataURL("image/png");
   };
 
-  sig = {
+  sig={
     load(data){
-      const img = new Image();
-      img.onload = ()=>{
+      const img=new Image();
+      img.onload=()=>{
         resize();
         ctx.drawImage(img,0,0,canvas.width/(window.devicePixelRatio||1),canvas.height/(window.devicePixelRatio||1));
       };
-      img.src = data;
+      img.src=data;
     },
     clear(){
       resize();
-      currentDoc.signature = "";
+      currentDoc.signature="";
     }
   };
 
-  $("#btnSigClear").onclick = ()=>sig.clear();
+  $("#btnSigClear").onclick=()=>sig.clear();
 }
 
 /* ================= SCHLIESSEN ================= */
