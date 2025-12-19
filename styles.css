@@ -183,3 +183,58 @@ textarea{min-height:88px;resize:vertical}
 @media (max-width:640px){
   .sticky{top:110px}
 }
+/* =========================================================
+   iOS FIX: Buttons & Print dürfen NICHT blockiert werden
+========================================================= */
+
+/* Buttons immer klickbar */
+button,
+.btn,
+.smallbtn {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 20;
+}
+
+/* Signatur darf NICHT über Buttons liegen */
+.sigWrap {
+  position: relative;
+  z-index: 5;
+}
+
+#sigPad {
+  position: relative;
+  z-index: 5;
+  pointer-events: auto;
+}
+
+/* Sticky Editor-Bar darf Print-Button nicht blockieren */
+.sticky {
+  z-index: 10;
+}
+
+/* Footer darf NIE Klicks abfangen */
+.footer {
+  pointer-events: none !important;
+}
+
+/* Print-Modus: UI sauber ausblenden */
+@media print {
+  .topbar,
+  .tabs,
+  .footer,
+  .btn,
+  .smallbtn {
+    display: none !important;
+  }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .card {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
+}

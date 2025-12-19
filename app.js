@@ -1,6 +1,6 @@
 /* =========================================================
-   Doggy Style Workspace – STUFE 5
-   PDF / Drucken (amtlich & archivfähig)
+   Doggy Style Workspace – STUFE 5 FINAL
+   PDF / Drucken iOS-sicher
 ========================================================= */
 
 const LS_KEY = "ds_stage5_state";
@@ -135,7 +135,7 @@ function openDoc(id){
   showPanel("editor");
 }
 
-/* ================= FORMULAR (wie STUFE 4) ================= */
+/* ================= FORMULAR ================= */
 function renderForm(){
   const root = $("#formRoot");
   root.innerHTML = "";
@@ -167,13 +167,22 @@ $("#btnSave").onclick = ()=>{
   alert("Gespeichert ✅");
 };
 
-/* ================= DRUCKEN ================= */
-$("#btnPrint").onclick = ()=>{
+/* ================= DRUCKEN – iOS FIX ================= */
+$("#btnPrint").onclick = (e)=>{
+  e.preventDefault();
+  e.stopPropagation();
+
   document.body.classList.add("print-mode");
+
+  // iOS braucht echten User-Gesture + Delay
   setTimeout(()=>{
     window.print();
-    document.body.classList.remove("print-mode");
-  },300);
+
+    setTimeout(()=>{
+      document.body.classList.remove("print-mode");
+    }, 500);
+
+  }, 100);
 };
 
 /* ================= UNTERSCHRIFT ================= */
@@ -227,7 +236,13 @@ function initSignature(){
       const img=new Image();
       img.onload=()=>{
         resize();
-        ctx.drawImage(img,0,0,canvas.width/(window.devicePixelRatio||1),canvas.height/(window.devicePixelRatio||1));
+        ctx.drawImage(
+          img,
+          0,
+          0,
+          canvas.width/(window.devicePixelRatio||1),
+          canvas.height/(window.devicePixelRatio||1)
+        );
       };
       img.src=data;
     },
