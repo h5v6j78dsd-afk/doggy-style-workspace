@@ -1,183 +1,106 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Doggy Style Workspace</title>
 
-  <!-- PWA -->
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#101014" />
-  <link rel="apple-touch-icon" href="assets/logo.png" />
-
-  <!-- Styles -->
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
 
-  <!-- ================= TOPBAR ================= -->
-  <header class="topbar">
-    <div class="brand">
-      <img src="assets/logo.png" alt="Doggy Style" class="brand__logo" />
-      <div>
-        <div class="brand__title">Doggy Style Workspace</div>
-        <div class="brand__sub">Formulare · Offline · iPad-optimiert</div>
-      </div>
-    </div>
-
-    <nav class="tabs" role="tablist">
-      <button class="tab is-active" data-tab="home">Start</button>
-      <button class="tab" data-tab="documents">Dokumente</button>
-      <button class="tab" data-tab="dogs">Hunde/Kunden</button>
-      <button class="tab" data-tab="settings">Einstellungen</button>
-    </nav>
-  </header>
-
-  <!-- ================= MAIN ================= -->
   <main class="shell">
 
-    <!-- ===== START ===== -->
-    <section class="panel is-active" id="home">
-      <div class="card hero">
-        <h1>Neues Dokument</h1>
+    <!-- ================= START ================= -->
+    <section id="home" class="panel is-active">
+      <div class="card">
+        <img src="logo.png" alt="Doggy Style Hundepension" class="hero-logo">
+      </div>
+
+      <div class="card">
+        <h2>Neues Dokument</h2>
+        <p>Vorlage auswählen, ausfüllen, unterschreiben und als PDF archivieren.</p>
+
+        <div class="field">
+          <span>Vorlage</span>
+          <select id="templateSelect"></select>
+        </div>
+
+        <button id="btnNewDoc">Dokument erstellen</button>
+
         <p class="muted">
-          Vorlage auswählen, ausfüllen, unterschreiben und als PDF archivieren.
+          Tipp: Safari → Teilen → Zum Home-Bildschirm für Offline-Nutzung.
         </p>
-
-        <div class="row">
-          <label class="field">
-            <span>Vorlage</span>
-            <select id="templateSelect"></select>
-          </label>
-          <button class="btn primary" id="btnNewDoc">
-            Dokument erstellen
-          </button>
-        </div>
-
-        <div class="hint">
-          <strong>Tipp:</strong>
-          Safari → Teilen → <em>Zum Home-Bildschirm</em> für Offline-Nutzung.
-        </div>
       </div>
 
       <div class="card">
         <h2>Zuletzt</h2>
-        <div id="recentList" class="list"></div>
+        <div id="recentDocs" class="muted">Noch keine Dokumente.</div>
       </div>
     </section>
 
-    <!-- ===== DOKUMENTE ===== -->
-    <section class="panel" id="documents">
+    <!-- ================= DOKUMENTE ================= -->
+    <section id="documents" class="panel">
       <div class="card">
-        <div class="row between">
-          <h1>Dokumente</h1>
-          <button class="btn" id="btnExportAll">
-            Backup exportieren (JSON)
-          </button>
-        </div>
-        <div id="docList" class="list"></div>
+        <h2>Dokumente</h2>
+        <div id="docList"></div>
       </div>
     </section>
 
-    <!-- ===== HUNDE / KUNDEN ===== -->
-    <section class="panel" id="dogs">
+    <!-- ================= HUNDE / KUNDEN ================= -->
+    <section id="dogs" class="panel">
       <div class="card">
-        <div class="row between">
-          <h1>Hunde / Kunden</h1>
-          <button class="btn primary" id="btnAddDog">
-            Neu anlegen
-          </button>
-        </div>
-        <div id="dogList" class="list"></div>
+        <h2>Hunde / Kunden</h2>
+        <button id="btnAddDog">Hund / Kunde anlegen</button>
+        <div id="dogList"></div>
       </div>
     </section>
 
-    <!-- ===== EINSTELLUNGEN ===== -->
-    <section class="panel" id="settings">
+    <!-- ================= EINSTELLUNGEN ================= -->
+    <section id="settings" class="panel">
       <div class="card">
-        <h1>Einstellungen</h1>
-        <p class="muted">
-          Alle Daten bleiben lokal auf diesem Gerät gespeichert.
-        </p>
-
-        <div class="row">
-          <button class="btn danger" id="btnWipe">
-            Alle lokalen Daten löschen
-          </button>
-        </div>
-
-        <div class="hint">
-          Für Backups regelmäßig <strong>Export (JSON)</strong> nutzen.
-        </div>
+        <h2>Einstellungen</h2>
+        <p class="muted">Offline-PWA · Lokale Datenspeicherung</p>
       </div>
     </section>
 
-    <!-- ===== EDITOR (DOKUMENT) ===== -->
-    <section class="panel" id="editor">
-
-      <!-- Sticky Kopf -->
-      <div class="card sticky">
-        <div class="row between">
-          <div>
-            <h1 id="editorTitle">Dokument</h1>
-            <div class="muted" id="editorMeta"></div>
-          </div>
-          <div class="row">
-            <button class="btn" id="btnSave">Speichern</button>
-            <button class="btn" id="btnPrint">Als PDF speichern</button>
-            <button class="btn" id="btnClose">Schließen</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Dokument Meta -->
+    <!-- ================= EDITOR ================= -->
+    <section id="editor" class="panel">
       <div class="card">
-        <div class="row">
-          <label class="field">
-            <span>Dokument-Name</span>
-            <input id="docName" type="text" placeholder="z.B. Hundeannahme_Müller_Bello" />
-          </label>
+        <h2 id="editorTitle">Dokument</h2>
+        <p id="editorMeta" class="muted"></p>
+
+        <div class="field">
+          <span>Dokument-Name</span>
+          <input id="docName" type="text">
         </div>
-      </div>
 
-      <!-- Dynamisches Formular -->
-      <div id="formRoot"></div>
+        <div id="editorForm"></div>
 
-      <!-- Unterschrift -->
-      <div class="card">
-        <h2>Unterschrift</h2>
-        <p class="muted">Bitte im Feld unterschreiben (Finger / Apple Pencil).</p>
-
-        <div class="sigWrap">
+        <div class="card">
+          <h2>Unterschrift</h2>
+          <p class="muted">Bitte im Feld unterschreiben (Finger / Apple Pencil).</p>
           <canvas id="sigPad"></canvas>
-          <div class="row">
-            <button class="btn" id="btnSigClear">Unterschrift löschen</button>
-          </div>
         </div>
-      </div>
 
-      <!-- DSGVO -->
-      <div class="card">
-        <h2>Datenschutz (DSGVO)</h2>
-        <p id="dsGvoText" class="muted"></p>
+        <button id="btnSave">Speichern</button>
+        <button id="btnPdf">Als PDF speichern</button>
+        <button id="btnClose">Schließen</button>
       </div>
-
     </section>
 
   </main>
 
-  <!-- ================= FOOTER ================= -->
-  <footer class="footer">
-    © Doggy Style Workspace · Offline-PWA
-  </footer>
+  <!-- ================= NAVIGATION ================= -->
+  <nav>
+    <div class="tab is-active" data-tab="home">Start</div>
+    <div class="tab" data-tab="documents">Dokumente</div>
+    <div class="tab" data-tab="dogs">Hunde/Kunden</div>
+    <div class="tab" data-tab="settings">Einstellungen</div>
+  </nav>
 
-  <!-- ================= SCRIPTS ================= -->
   <script src="app.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js');
-    }
-  </script>
-
 </body>
 </html>
