@@ -1,9 +1,9 @@
 /* =========================================================
-   Doggy Style Workspace – STUFE 3
-   Große Hundeannahme + Pflichtfelder
+   Doggy Style Workspace – STUFE 4
+   Unterschrift (Canvas) stabil & persistent
 ========================================================= */
 
-const LS_KEY = "ds_stage3_state";
+const LS_KEY = "ds_stage4_state";
 
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -41,6 +41,7 @@ $("#btnNewDoc").onclick = ()=>{
     title: "Hundeannahme / Betreuungsvertrag",
     dogId: "",
     fields: {},
+    signature: "",
     updatedAt: Date.now()
   };
   state.docs.unshift(doc);
@@ -117,6 +118,7 @@ function renderDocs(){
 
 /* ================= EDITOR ================= */
 let currentDoc = null;
+let sig = null;
 
 function openDoc(id){
   currentDoc = state.docs.find(d=>d.id===id);
@@ -127,15 +129,17 @@ function openDoc(id){
   $("#docName").value = currentDoc.title;
 
   renderForm();
+  initSignature();
+  if(currentDoc.signature) sig.load(currentDoc.signature);
+
   showPanel("editor");
 }
 
-/* ================= FORMULAR ================= */
+/* ================= FORMULAR (wie STUFE 3) ================= */
 function renderForm(){
   const root = $("#formRoot");
   root.innerHTML = "";
 
-  // Hund/Kunde Pflicht
   const dogCard = document.createElement("div");
   dogCard.className = "card";
   dogCard.innerHTML = "<h2>Hund / Kunde *</h2>";
@@ -148,7 +152,6 @@ function renderForm(){
   dogCard.appendChild(sel);
   root.appendChild(dogCard);
 
-  // Abschnitte
   addSection(root,"Angaben zum Hund",[
     field("hund_name","Name des Hundes *"),
     field("hund_rasse","Rasse *"),
@@ -158,11 +161,6 @@ function renderForm(){
   addSection(root,"Gesundheit",[
     checkbox("impfung","Impfschutz vollständig *"),
     field("krankheiten","Krankheiten / Besonderheiten")
-  ]);
-
-  addSection(root,"Verhalten",[
-    checkbox("vertraeglich","Verträglich mit anderen Hunden"),
-    field("besonderheiten","Besonderheiten")
   ]);
 
   addSection(root,"Haftung & Vereinbarung",[
@@ -178,7 +176,6 @@ function addSection(root,title,fields){
   fields.forEach(f=>c.appendChild(f));
   root.appendChild(c);
 }
-
 function field(key,label){
   const l=document.createElement("label");
   l.className="field";
@@ -189,7 +186,6 @@ function field(key,label){
   l.appendChild(i);
   return l;
 }
-
 function checkbox(key,label){
   const l=document.createElement("label");
   l.className="field";
@@ -213,6 +209,7 @@ $("#btnSave").onclick = ()=>{
   if(!currentDoc.fields.impfung) missing.push("Impfschutz");
   if(!currentDoc.fields.angaben_wahr) missing.push("Angaben wahrheitsgemäß");
   if(!currentDoc.fields.agb) missing.push("AGB");
+  if(!currentDoc.signature) missing.push("Unterschrift");
 
   if(missing.length){
     alert("Bitte noch ausfüllen:\n\n• "+missing.join("\n• "));
@@ -224,6 +221,71 @@ $("#btnSave").onclick = ()=>{
   save();
   alert("Gespeichert ✅");
 };
+
+/* ================= UNTERSCHRIFT (Canvas) ================= */
+function initSignature(){
+  const canvas = $("#sigPad");
+  const ctx = canvas.getContext("2d");
+
+  function resize(){
+    const r = canvas.getBoundingClientRect();
+    const d = window.devicePixelRatio || 1;
+    canvas.width = r.width * d;
+    canvas.height = r.height * d;
+    ctx.setTransform(d,0,0,d,0,0);
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0,0,r.width,r.height);
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+  }
+
+  resize();
+
+  let drawing = false;
+  let last = null;
+
+  const pos = e=>{
+    const b = canvas.getBoundingClientRect();
+    return { x: e.clientX - b.left, y: e.clientY - b.top };
+  };
+
+  canvas.onpointerdown = e=>{
+    canvas.setPointerCapture(e.pointerId);
+    drawing = true;
+    last = pos(e);
+  };
+  canvas.onpointermove = e=>{
+    if(!drawing) return;
+    const p = pos(e);
+    ctx.beginPath();
+    ctx.moveTo(last.x,last.y);
+    ctx.lineTo(p.x,p.y);
+    ctx.stroke();
+    last = p;
+  };
+  canvas.onpointerup = ()=>{
+    drawing = false;
+    currentDoc.signature = canvas.toDataURL("image/png");
+  };
+
+  sig = {
+    load(data){
+      const img = new Image();
+      img.onload = ()=>{
+        resize();
+        ctx.drawImage(img,0,0,canvas.width/(window.devicePixelRatio||1),canvas.height/(window.devicePixelRatio||1));
+      };
+      img.src = data;
+    },
+    clear(){
+      resize();
+      currentDoc.signature = "";
+    }
+  };
+
+  $("#btnSigClear").onclick = ()=>sig.clear();
+}
 
 /* ================= SCHLIESSEN ================= */
 $("#btnClose").onclick = ()=>{
