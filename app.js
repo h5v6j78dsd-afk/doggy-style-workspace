@@ -1,9 +1,10 @@
 /* =========================================================
-   Doggy Style Workspace – FINAL FIX
-   Rechtssicherer Editor + PDF + Signatur-Sperre
+   Doggy Style Workspace – FINAL OPTION B
+   Vollständige rechtssichere Hundeannahme / Betreuungsvertrag
+   inkl. Pflichtfelder, Unterschrift-Sperre & PDF
 ========================================================= */
 
-const LS_KEY = "ds_final_fix";
+const LS_KEY = "ds_option_b_final";
 
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -42,7 +43,8 @@ $("#btnNewDoc").onclick = ()=>{
     dogId: "",
     fields: {},
     signature: "",
-    locked: false,               // 🔒 NEU
+    locked: false,
+    createdAt: Date.now(),
     updatedAt: Date.now()
   };
   state.docs.unshift(doc);
@@ -50,7 +52,7 @@ $("#btnNewDoc").onclick = ()=>{
   openDoc(doc.id);
 };
 
-/* ================= HUNDE ================= */
+/* ================= HUNDE / KUNDEN ================= */
 $("#btnAddDog").onclick = ()=>{
   const name = prompt("Name des Hundes:");
   if(!name) return;
@@ -59,7 +61,9 @@ $("#btnAddDog").onclick = ()=>{
 
   state.dogs.push({
     id: Date.now().toString(),
-    name, owner, phone
+    name,
+    owner,
+    phone
   });
   save();
   renderDogs();
@@ -69,7 +73,7 @@ function renderDogs(){
   const list = $("#dogList");
   list.innerHTML = "";
   if(!state.dogs.length){
-    list.innerHTML = "<div class='muted'>Noch keine Hunde.</div>";
+    list.innerHTML = "<div class='muted'>Noch keine Hunde/Kunden.</div>";
     return;
   }
   state.dogs.forEach(d=>{
@@ -89,14 +93,12 @@ function renderDocs(){
     return;
   }
   state.docs.forEach(d=>{
-    const dog=state.dogs.find(x=>x.id===d.dogId);
     const el=document.createElement("div");
     el.className="item";
     el.innerHTML=`
       <div>
         <strong>${d.title}</strong>
         <small>
-          ${dog?"🐕 "+dog.name+" · ":""}
           ${new Date(d.updatedAt).toLocaleString("de-DE")}
           ${d.locked ? " · 🔒 abgeschlossen" : ""}
         </small>
@@ -117,49 +119,77 @@ function openDoc(id){
   if(!currentDoc) return;
 
   $("#editorTitle").textContent=currentDoc.title;
-  $("#editorMeta").textContent="Große Hundeannahme";
+  $("#editorMeta").textContent="Rechtssichere Hundeannahme / Betreuungsvertrag";
   $("#docName").value=currentDoc.title;
 
   renderEditorForm();
   initSignature();
-
   if(currentDoc.signature) sig.load(currentDoc.signature);
 
   showPanel("editor");
 }
 
-/* ================= EDITOR-FORM ================= */
+/* ================= FORMULAR ================= */
 function renderEditorForm(){
   const root=$("#formRoot");
   root.innerHTML="";
 
-  const card=document.createElement("div");
-  card.className="card";
-  card.innerHTML="<h2>Halter / Hund *</h2>";
+  /* HALTER */
+  addSection(root,"Angaben zum Hundehalter *",[
+    field("halter_name","Vor- und Nachname *"),
+    field("halter_strasse","Straße / Hausnummer *"),
+    field("halter_plz","PLZ *"),
+    field("halter_ort","Ort *"),
+    field("halter_tel","Telefon *"),
+    field("halter_email","E-Mail *")
+  ]);
 
-  const sel=document.createElement("select");
-  sel.innerHTML=`<option value="">– bitte auswählen –</option>`+
-    state.dogs.map(d=>`<option value="${d.id}">${d.name} (${d.owner})</option>`).join("");
-  sel.value=currentDoc.dogId;
-  sel.onchange=()=>currentDoc.dogId=sel.value;
-
-  card.appendChild(sel);
-  root.appendChild(card);
-
-  addSection(root,"Angaben zum Hund",[
+  /* HUND */
+  addSection(root,"Angaben zum Hund *",[
     field("hund_name","Name des Hundes *"),
     field("hund_rasse","Rasse *"),
-    field("hund_alter","Alter / Geburtsdatum *")
+    select("hund_geschlecht","Geschlecht *",["Rüde","Hündin"]),
+    field("hund_alter","Geburtsdatum / Alter *"),
+    select("hund_kastriert","Kastriert *",["Ja","Nein"]),
+    select("hund_laeufig","Bei Hündin aktuell läufig?",["Nein","Ja"])
   ]);
 
-  addSection(root,"Gesundheit",[
+  /* HAFTPFLICHT */
+  addSection(root,"Hundehalter-Haftpflichtversicherung *",[
+    field("versicherung","Versicherer *"),
+    field("vers_nr","Versicherungsnummer *")
+  ]);
+
+  /* NOTFALL */
+  addSection(root,"Notfallkontakt *",[
+    field("notfall_name","Name *"),
+    field("notfall_tel","Telefon *")
+  ]);
+
+  /* TIERARZT */
+  addSection(root,"Tierarzt *",[
+    field("ta_name","Praxis / Name *"),
+    field("ta_ort","Ort *"),
+    field("ta_tel","Telefon *")
+  ]);
+
+  /* GESUNDHEIT */
+  addSection(root,"Gesundheit & Medikamente",[
     checkbox("impfung","Impfschutz vollständig *"),
-    field("krankheiten","Krankheiten / Besonderheiten")
+    textarea("krankheiten","Krankheiten / Besonderheiten"),
+    textarea("medikamente","Medikamente (Name / Dosierung / Zeiten)")
   ]);
 
-  addSection(root,"Haftung & Vereinbarung",[
-    checkbox("angaben_wahr","Angaben wahrheitsgemäß *"),
-    checkbox("agb","AGB gelesen & akzeptiert *")
+  /* HAFTUNG */
+  addSection(root,"Haftung & Betreuung *",[
+    checkbox("notfall_einwilligung","Einwilligung zu tierärztlicher Notfallbehandlung *"),
+    checkbox("kosten","Übernahme aller entstehenden Kosten *"),
+    checkbox("haftung","Haftungsfreistellung für Doggy Style Hundepension *")
+  ]);
+
+  /* FOTO */
+  addSection(root,"Fotos / Social Media (optional)",[
+    checkbox("foto","Einwilligung zur Foto-/Videoverwendung")
   ]);
 }
 
@@ -182,6 +212,30 @@ function field(key,label){
   return l;
 }
 
+function textarea(key,label){
+  const l=document.createElement("label");
+  l.className="field";
+  l.innerHTML=`<span>${label}</span>`;
+  const i=document.createElement("textarea");
+  i.value=currentDoc.fields[key]||"";
+  i.oninput=()=>currentDoc.fields[key]=i.value;
+  l.appendChild(i);
+  return l;
+}
+
+function select(key,label,options){
+  const l=document.createElement("label");
+  l.className="field";
+  l.innerHTML=`<span>${label}</span>`;
+  const s=document.createElement("select");
+  s.innerHTML=`<option value="">– bitte auswählen –</option>`+
+    options.map(o=>`<option value="${o}">${o}</option>`).join("");
+  s.value=currentDoc.fields[key]||"";
+  s.onchange=()=>currentDoc.fields[key]=s.value;
+  l.appendChild(s);
+  return l;
+}
+
 function checkbox(key,label){
   const l=document.createElement("label");
   l.className="field";
@@ -196,24 +250,24 @@ function checkbox(key,label){
 
 /* ================= SPEICHERN ================= */
 $("#btnSave").onclick=()=>{
-  const missing=[];
-  if(!currentDoc.dogId) missing.push("Hund / Kunde");
-  if(!currentDoc.fields.hund_name) missing.push("Name des Hundes");
-  if(!currentDoc.fields.hund_rasse) missing.push("Rasse");
-  if(!currentDoc.fields.hund_alter) missing.push("Alter");
-  if(!currentDoc.fields.impfung) missing.push("Impfschutz");
-  if(!currentDoc.fields.angaben_wahr) missing.push("Angaben wahrheitsgemäß");
-  if(!currentDoc.fields.agb) missing.push("AGB");
+  const required=[
+    "halter_name","halter_strasse","halter_plz","halter_ort","halter_tel","halter_email",
+    "hund_name","hund_rasse","hund_geschlecht","hund_alter","hund_kastriert",
+    "versicherung","vers_nr",
+    "notfall_name","notfall_tel",
+    "ta_name","ta_ort","ta_tel",
+    "impfung","notfall_einwilligung","kosten","haftung"
+  ];
+  const missing=required.filter(k=>!currentDoc.fields[k]);
   if(!currentDoc.signature) missing.push("Unterschrift");
 
   if(missing.length){
-    alert("Bitte noch ausfüllen:\n\n• "+missing.join("\n• "));
+    alert("Bitte noch ausfüllen / bestätigen:\n\n• "+missing.join("\n• "));
     return;
   }
 
-  currentDoc.title=$("#docName").value||currentDoc.title;
   currentDoc.updatedAt=Date.now();
-  currentDoc.locked=true;     // 🔒 NACH SPEICHERN SPERREN
+  currentDoc.locked=true;
   save();
   alert("Gespeichert & abgeschlossen ✅");
 };
@@ -247,7 +301,6 @@ function initSignature(){
   }
   resize();
 
-  // 🔒 WENN GESPERRT → NICHT MEHR ZEICHNEN
   if(currentDoc.locked){
     c.style.pointerEvents="none";
     $("#btnSigClear").style.display="none";
@@ -284,12 +337,7 @@ function initSignature(){
       const img=new Image();
       img.onload=()=>{
         resize();
-        ctx.drawImage(
-          img,
-          0,0,
-          c.width/(window.devicePixelRatio||1),
-          c.height/(window.devicePixelRatio||1)
-        );
+        ctx.drawImage(img,0,0,c.width/(window.devicePixelRatio||1),c.height/(window.devicePixelRatio||1));
       };
       img.src=data;
     },
