@@ -1,88 +1,142 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Doggy Style Workspace</title>
-
-  <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#101014" />
+  <link rel="apple-touch-icon" href="assets/logo.png" />
+  <link rel="stylesheet" href="styles.css" />
 </head>
-
 <body>
-
-<!-- HEADER -->
-<header class="topbar">
-  <div class="brand">
-    <img src="assets/logo.png" class="brand__logo" alt="Doggy Style">
-    <div class="brand__text">
-      <strong>Doggy Style Workspace</strong><br>
-      <small>Formularmappe · Offline</small>
+  <header class="topbar">
+    <div class="brand">
+      <img src="assets/logo.png" alt="Doggy Style" class="brand__logo" />
+      <div class="brand__text">
+        <div class="brand__title">Doggy Style Workspace</div>
+        <div class="brand__sub">Formularmappe · Offline · iPad‑freundlich</div>
+      </div>
     </div>
-  </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab is-active" data-tab="home">Start</button>
+      <button class="tab" data-tab="documents">Dokumente</button>
+      <button class="tab" data-tab="dogs">Hunde/Kunden</button>
+      <button class="tab" data-tab="settings">Einstellungen</button>
+    </nav>
+  </header>
 
-  <nav class="tabs">
-    <button class="tab active" data-tab="start">Start</button>
-    <button class="tab" data-tab="documents">Dokumente</button>
-    <button class="tab" data-tab="people">Hunde/Kunden</button>
-    <button class="tab" data-tab="settings">Einstellungen</button>
-  </nav>
-</header>
+  <main class="shell">
+    <section class="panel is-active" id="home">
+      <div class="card hero">
+        <h1>Neues Dokument</h1>
+        <p>Wähle eine Vorlage, fülle aus, unterschreibe – und speichere als PDF über „Drucken“.</p>
+        <div class="row">
+          <label class="field">
+            <span>Vorlage</span>
+            <select id="templateSelect"></select>
+          </label>
+          <button class="btn primary" id="btnNewDoc">Dokument erstellen</button>
+        </div>
+        <div class="hint">
+          <strong>Tipp:</strong> Installiere die App als PWA: In Safari <em>Teilen → Zum Home‑Bildschirm</em>.
+        </div>
+      </div>
 
-<!-- MAIN -->
-<main class="content">
+      <div class="card">
+        <h2>Zuletzt</h2>
+        <div id="recentList" class="list"></div>
+      </div>
+    </section>
 
-  <!-- START -->
-  <section class="panel active" id="start">
-    <div class="card">
-      <h2>Neues Dokument</h2>
-      <p>
-        Vorlage auswählen, ausfüllen, unterschreiben  
-        und als PDF über <strong>„Drucken“</strong> speichern.
-      </p>
+    <section class="panel" id="documents">
+      <div class="card">
+        <div class="row between">
+          <h1>Dokumente</h1>
+          <button class="btn" id="btnExportAll">Export: Backup (JSON)</button>
+        </div>
+        <div id="docList" class="list"></div>
+      </div>
+    </section>
 
-      <label for="templateSelect">Vorlage</label>
-      <select id="templateSelect"></select>
+    <section class="panel" id="dogs">
+      <div class="card">
+        <div class="row between">
+          <h1>Hunde/Kunden</h1>
+          <button class="btn primary" id="btnAddDog">Neu anlegen</button>
+        </div>
+        <div id="dogList" class="list"></div>
+      </div>
+    </section>
 
-      <button id="btnCreateDoc">Dokument erstellen</button>
-    </div>
-  </section>
+    <section class="panel" id="settings">
+      <div class="card">
+        <h1>Einstellungen</h1>
+        <p>Alles bleibt lokal auf deinem Gerät (Offline‑First).</p>
+        <div class="row">
+          <button class="btn danger" id="btnWipe">Alle lokalen Daten löschen</button>
+        </div>
+        <div class="hint">
+          PDFs archivierst du am besten in <strong>Dateien</strong> in einem Ordner z. B. <em>DoggyStyle/Docs</em>.
+        </div>
+      </div>
+    </section>
 
-  <!-- DOKUMENTE -->
-  <section class="panel" id="documents">
-    <div class="card">
-      <h2>Dokumente</h2>
-      <p>Exportiere alle gespeicherten Daten als Backup.</p>
-      <button id="btnExport">Export (JSON)</button>
-    </div>
-  </section>
+    <section class="panel" id="editor">
+      <div class="card sticky">
+        <div class="row between">
+          <div>
+            <h1 id="editorTitle">Dokument</h1>
+            <div class="muted" id="editorMeta"></div>
+          </div>
+          <div class="row">
+            <button class="btn" id="btnSave">Speichern</button>
+            <button class="btn" id="btnPrint">Als PDF speichern (Drucken)</button>
+            <button class="btn" id="btnClose">Schließen</button>
+          </div>
+        </div>
+      </div>
 
-  <!-- HUNDE / KUNDEN -->
-  <section class="panel" id="people">
-    <div class="card">
-      <h2>Hunde / Kunden</h2>
-      <button>Neu anlegen</button>
-    </div>
-  </section>
+      <div class="card">
+        <div class="row">
+          <label class="field">
+            <span>Kunde/Halter</span>
+            <select id="dogSelect"></select>
+          </label>
+          <label class="field">
+            <span>Dokument‑Name</span>
+            <input id="docName" type="text" placeholder="z.B. Hundeannahme_Müller_Bello" />
+          </label>
+        </div>
+      </div>
 
-  <!-- EINSTELLUNGEN -->
-  <section class="panel" id="settings">
-    <div class="card">
-      <h2>Einstellungen</h2>
-      <p>
-        Alles bleibt lokal auf diesem Gerät gespeichert  
-        (Offline-First).
-      </p>
-      <button id="btnClearAll">Alle lokalen Daten löschen</button>
-    </div>
-  </section>
+      <div id="formRoot"></div>
 
-</main>
+      <div class="card">
+        <h2>Unterschrift</h2>
+        <p class="muted">Unterschreibe im Feld (Finger/Apple Pencil).</p>
+        <div class="sigWrap">
+          <canvas id="sigPad" width="900" height="260"></canvas>
+          <div class="row">
+            <button class="btn" id="btnSigClear">Unterschrift löschen</button>
+          </div>
+        </div>
+      </div>
 
-<footer>
-  © Doggy Style Workspace · Offline-PWA
-</footer>
+      <div class="card">
+        <h2>Datenschutz (DSGVO)</h2>
+        <p id="dsGvoText" class="muted"></p>
+      </div>
+    </section>
+  </main>
 
-<script src="app.js"></script>
+  <footer class="footer">
+    <span>© Doggy Style Workspace · Offline‑PWA</span>
+  </footer>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+  </script>
 </body>
 </html>
