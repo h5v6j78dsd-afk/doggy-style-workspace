@@ -1,9 +1,9 @@
 /* =========================================================
-   Doggy Style Workspace – STUFE 5 FINAL
-   PDF / Drucken iOS-sicher
+   Doggy Style Workspace – FINAL
+   Editor + Pflichtfelder + Unterschrift + PDF (iOS-safe)
 ========================================================= */
 
-const LS_KEY = "ds_stage5_state";
+const LS_KEY = "ds_final_state";
 
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -19,7 +19,7 @@ function save(){
 
 /* ================= NAVIGATION ================= */
 $$(".tab").forEach(btn=>{
-  btn.onclick=()=>{
+  btn.onclick = ()=>{
     $$(".tab").forEach(b=>b.classList.remove("is-active"));
     btn.classList.add("is-active");
     $$(".panel").forEach(p=>p.classList.remove("is-active"));
@@ -53,6 +53,7 @@ $("#btnNewDoc").onclick = ()=>{
 $("#btnAddDog").onclick = ()=>{
   const name = prompt("Name des Hundes:");
   if(!name) return;
+
   const owner = prompt("Name Halter:");
   const phone = prompt("Telefon:");
 
@@ -70,17 +71,19 @@ $("#btnAddDog").onclick = ()=>{
 function renderDogs(){
   const list = $("#dogList");
   list.innerHTML = "";
+
   if(!state.dogs.length){
     list.innerHTML = "<div class='muted'>Noch keine Hunde/Kunden.</div>";
     return;
   }
+
   state.dogs.forEach(d=>{
     const el = document.createElement("div");
     el.className = "item";
     el.innerHTML = `
       <div>
         <strong>${d.name}</strong>
-        <small>${d.owner||""} · ${d.phone||""}</small>
+        <small>${d.owner || ""} · ${d.phone || ""}</small>
       </div>
     `;
     list.appendChild(el);
@@ -91,10 +94,12 @@ function renderDogs(){
 function renderDocs(){
   const list = $("#docList");
   list.innerHTML = "";
+
   if(!state.docs.length){
     list.innerHTML = "<div class='muted'>Noch keine Dokumente.</div>";
     return;
   }
+
   state.docs.forEach(d=>{
     const dog = state.dogs.find(x=>x.id===d.dogId);
     const el = document.createElement("div");
@@ -128,61 +133,124 @@ function openDoc(id){
   $("#editorMeta").textContent = "Große Hundeannahme";
   $("#docName").value = currentDoc.title;
 
-  renderForm();
+  renderEditorForm();
   initSignature();
-  if(currentDoc.signature) sig.load(currentDoc.signature);
+
+  if(currentDoc.signature){
+    sig.load(currentDoc.signature);
+  }
 
   showPanel("editor");
 }
 
-/* ================= FORMULAR ================= */
-function renderForm(){
+/* ================= EDITOR-FORMULAR ================= */
+function renderEditorForm(){
   const root = $("#formRoot");
   root.innerHTML = "";
 
-  const dog = state.dogs.find(d=>d.id===currentDoc.dogId);
+  /* Hund / Kunde */
+  const dogCard = document.createElement("div");
+  dogCard.className = "card";
+  dogCard.innerHTML = "<h2>Halter / Hund *</h2>";
 
-  const info = document.createElement("div");
-  info.className = "card";
-  info.innerHTML = `
-    <h2>Halter / Hund</h2>
-    <p><strong>Hund:</strong> ${dog?.name||""}</p>
-    <p><strong>Halter:</strong> ${dog?.owner||""}</p>
-    <p><strong>Telefon:</strong> ${dog?.phone||""}</p>
-  `;
-  root.appendChild(info);
+  const sel = document.createElement("select");
+  sel.innerHTML =
+    `<option value="">– bitte auswählen –</option>` +
+    state.dogs.map(d =>
+      `<option value="${d.id}">${d.name} (${d.owner || ""})</option>`
+    ).join("");
 
-  for(const key in currentDoc.fields){
-    const row=document.createElement("div");
-    row.className="print-row";
-    row.innerHTML=`<strong>${key}:</strong> ${currentDoc.fields[key]}`;
-    root.appendChild(row);
-  }
+  sel.value = currentDoc.dogId;
+  sel.onchange = ()=> currentDoc.dogId = sel.value;
+
+  dogCard.appendChild(sel);
+  root.appendChild(dogCard);
+
+  addSection(root,"Angaben zum Hund",[
+    field("hund_name","Name des Hundes *"),
+    field("hund_rasse","Rasse *"),
+    field("hund_alter","Alter / Geburtsdatum *")
+  ]);
+
+  addSection(root,"Gesundheit",[
+    checkbox("impfung","Impfschutz vollständig *"),
+    field("krankheiten","Krankheiten / Besonderheiten")
+  ]);
+
+  addSection(root,"Haftung & Vereinbarung",[
+    checkbox("angaben_wahr","Angaben wahrheitsgemäß *"),
+    checkbox("agb","AGB gelesen & akzeptiert *")
+  ]);
 }
 
-/* ================= SPEICHERN ================= */
+function addSection(root,title,fields){
+  const c=document.createElement("div");
+  c.className="card";
+  c.innerHTML=`<h2>${title}</h2>`;
+  fields.forEach(f=>c.appendChild(f));
+  root.appendChild(c);
+}
+
+function field(key,label){
+  const l=document.createElement("label");
+  l.className="field";
+  l.innerHTML=`<span>${label}</span>`;
+  const i=document.createElement("input");
+  i.value=currentDoc.fields[key]||"";
+  i.oninput=()=>currentDoc.fields[key]=i.value;
+  l.appendChild(i);
+  return l;
+}
+
+function checkbox(key,label){
+  const l=document.createElement("label");
+  l.className="field";
+  l.innerHTML=`<span>${label}</span>`;
+  const i=document.createElement("input");
+  i.type="checkbox";
+  i.checked=!!currentDoc.fields[key];
+  i.onchange=()=>currentDoc.fields[key]=i.checked;
+  l.appendChild(i);
+  return l;
+}
+
+/* ================= SPEICHERN (MIT PRÜFUNG) ================= */
 $("#btnSave").onclick = ()=>{
+  const missing=[];
+
+  if(!currentDoc.dogId) missing.push("Hund / Kunde");
+  if(!currentDoc.fields.hund_name) missing.push("Name des Hundes");
+  if(!currentDoc.fields.hund_rasse) missing.push("Rasse");
+  if(!currentDoc.fields.hund_alter) missing.push("Alter / Geburtsdatum");
+  if(!currentDoc.fields.impfung) missing.push("Impfschutz");
+  if(!currentDoc.fields.angaben_wahr) missing.push("Angaben wahrheitsgemäß");
+  if(!currentDoc.fields.agb) missing.push("AGB");
+  if(!currentDoc.signature) missing.push("Unterschrift");
+
+  if(missing.length){
+    alert("Bitte noch ausfüllen:\n\n• "+missing.join("\n• "));
+    return;
+  }
+
+  currentDoc.title = $("#docName").value || currentDoc.title;
   currentDoc.updatedAt = Date.now();
   save();
   alert("Gespeichert ✅");
 };
 
-/* ================= DRUCKEN – iOS FIX ================= */
+/* ================= PDF / DRUCKEN (iOS-SAFE) ================= */
 $("#btnPrint").onclick = (e)=>{
   e.preventDefault();
   e.stopPropagation();
 
   document.body.classList.add("print-mode");
 
-  // iOS braucht echten User-Gesture + Delay
   setTimeout(()=>{
     window.print();
-
     setTimeout(()=>{
       document.body.classList.remove("print-mode");
-    }, 500);
-
-  }, 100);
+    },500);
+  },100);
 };
 
 /* ================= UNTERSCHRIFT ================= */
@@ -206,7 +274,6 @@ function initSignature(){
   resize();
 
   let drawing=false,last=null;
-
   const pos=e=>{
     const b=canvas.getBoundingClientRect();
     return {x:e.clientX-b.left,y:e.clientY-b.top};
@@ -228,18 +295,17 @@ function initSignature(){
   };
   canvas.onpointerup=()=>{
     drawing=false;
-    currentDoc.signature=canvas.toDataURL("image/png");
+    currentDoc.signature = canvas.toDataURL("image/png");
   };
 
-  sig={
+  sig = {
     load(data){
       const img=new Image();
       img.onload=()=>{
         resize();
         ctx.drawImage(
           img,
-          0,
-          0,
+          0,0,
           canvas.width/(window.devicePixelRatio||1),
           canvas.height/(window.devicePixelRatio||1)
         );
@@ -252,7 +318,7 @@ function initSignature(){
     }
   };
 
-  $("#btnSigClear").onclick=()=>sig.clear();
+  $("#btnSigClear").onclick = ()=>sig.clear();
 }
 
 /* ================= SCHLIESSEN ================= */
