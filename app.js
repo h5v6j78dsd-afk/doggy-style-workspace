@@ -325,46 +325,79 @@ $("#btnWipe").addEventListener("click",()=>{
   renderDocs();
   showPanel("home");
 })();
-/* ===== SIGNATUR – ZEICHNEN AKTIVIEREN (MASTER-SAFE) ===== */
+/* ===== SIGNATUR FULLSCREEN LOGIK (ISOLIERT) ===== */
 (function () {
-  const canvas = document.getElementById("sigPad");
-  if (!canvas) return;
+  const preview = document.getElementById("sigPad"); // bestehendes Feld (Vorschau)
+  const overlay = document.getElementById("signatureOverlay");
+  const canvas = document.getElementById("sigCanvas");
+  const btnClose = document.getElementById("sigClose");
+  const btnClear = document.getElementById("sigClear");
+  const btnConfirm = document.getElementById("sigConfirm");
+
+  if (!preview || !overlay || !canvas) return;
 
   const ctx = canvas.getContext("2d");
   let drawing = false;
 
-  function resizeCanvas() {
+  function resize() {
     const ratio = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * ratio;
-    canvas.height = rect.height * ratio;
+    canvas.width = canvas.clientWidth * ratio;
+    canvas.height = canvas.clientHeight * ratio;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.strokeStyle = "#000";
   }
 
-  resizeCanvas();
-  window.addEventListener("resize", resizeCanvas);
+  function openSig() {
+    overlay.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+    requestAnimationFrame(resize);
+  }
+
+  function closeSig() {
+    overlay.classList.add("hidden");
+    document.body.style.overflow = "";
+  }
 
   function start(e) {
     drawing = true;
+    const r = canvas.getBoundingClientRect();
     ctx.beginPath();
-    ctx.moveTo(e.offsetX, e.offsetY);
+    ctx.moveTo(e.clientX - r.left, e.clientY - r.top);
   }
 
   function move(e) {
     if (!drawing) return;
-    ctx.lineTo(e.offsetX, e.offsetY);
+    const r = canvas.getBoundingClientRect();
+    ctx.lineTo(e.clientX - r.left, e.clientY - r.top);
     ctx.stroke();
   }
 
-  function stop() {
-    drawing = false;
-  }
+  function stop() { drawing = false; }
+
+  preview.addEventListener("click", openSig);
+  btnClose.addEventListener("click", closeSig);
 
   canvas.addEventListener("pointerdown", start);
   canvas.addEventListener("pointermove", move);
   canvas.addEventListener("pointerup", stop);
   canvas.addEventListener("pointerleave", stop);
+
+  btnClear.addEventListener("click", () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  });
+
+  btnConfirm.addEventListener("click", () => {
+    // Bild in das bestehende Feld übernehmen
+    const img = canvas.toDataURL("image/png");
+    preview.style.backgroundImage = `url(${img})`;
+    preview.style.backgroundSize = "contain";
+    preview.style.backgroundRepeat = "no-repeat";
+    preview.style.backgroundPosition = "center";
+    preview.dataset.signed = "true"; // Pflichtfeld-Check kann das nutzen
+    closeSig();
+  });
+
+  window.addEventListener("resize", resize);
 })();
