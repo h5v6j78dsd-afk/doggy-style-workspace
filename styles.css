@@ -42,3 +42,15 @@ textarea{min-height:88px;resize:vertical}
   border-radius: 12px;
   touch-action: none;
 }
+.signature-card,
+.signature-container,
+.signature-wrapper {
+  pointer-events: none;
+}
+/* ===== SIGNATUR – POINTER EVENTS FIX ===== */
+
+#sigPad {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 5;
+}
