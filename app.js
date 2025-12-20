@@ -229,84 +229,78 @@ function saveCurrent(alertOk){
 }
 
 function initSig(){
-  const canvas = $("#sigPad");
+  const canvas = document.getElementById("sigPad");
   if(!canvas) return;
 
   const ctx = canvas.getContext("2d");
+
+  const WIDTH = canvas.parentElement.clientWidth;
+  const HEIGHT = 160; // feste, sichere Höhe
+
   const ratio = Math.max(window.devicePixelRatio || 1, 1);
-  const HEIGHT = 160; // feste, stabile Höhe für iOS / PWA
+  canvas.width  = Math.floor(WIDTH * ratio);
+  canvas.height = Math.floor(HEIGHT * ratio);
+  canvas.style.width = WIDTH + "px";
+  canvas.style.height = HEIGHT + "px";
 
-  function resize(){
+  ctx.setTransform(ratio,0,0,ratio,0,0);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0,0,WIDTH,HEIGHT);
+
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+
+  let drawing = false;
+  let last = null;
+  let dirty = false;
+
+  const getPos = e => {
     const r = canvas.getBoundingClientRect();
-    canvas.width  = Math.floor(r.width * ratio);
-    canvas.height = Math.floor(HEIGHT * ratio);
-    ctx.setTransform(ratio,0,0,ratio,0,0);
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0,0,r.width,HEIGHT);
-  }
+    const p = e.touches ? e.touches[0] : e;
+    return { x: p.clientX - r.left, y: p.clientY - r.top };
+  };
 
-  resize();
-
-  let drawing=false, dirty=false;
-
-  function pos(e){
-    const r=canvas.getBoundingClientRect();
-    const t=e.touches?e.touches[0]:e;
-    return {x:t.clientX-r.left,y:t.clientY-r.top};
-  }
-
-  function down(e){
+  const start = e => {
     e.preventDefault();
-    drawing=true;
-    const p=pos(e);
+    drawing = true;
+    last = getPos(e);
+    dirty = true;
+  };
+
+  const move = e => {
+    if(!drawing) return;
+    e.preventDefault();
+    const p = getPos(e);
     ctx.beginPath();
-    ctx.moveTo(p.x,p.y);
-  }
-
-  function move(e){
-    if(!drawing) return;
-    e.preventDefault();
-    const p=pos(e);
-    ctx.lineTo(p.x,p.y);
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(p.x, p.y);
     ctx.stroke();
-    dirty=true;
-  }
+    last = p;
+  };
 
-  function up(e){
-    if(!drawing) return;
-    e.preventDefault();
-    drawing=false;
-  }
+  const end = () => { drawing = false; last = null; };
 
-  canvas.addEventListener("mousedown",down);
-  canvas.addEventListener("mousemove",move);
-  canvas.addEventListener("mouseup",up);
-  canvas.addEventListener("mouseleave",up);
+  canvas.addEventListener("touchstart", start, {passive:false});
+  canvas.addEventListener("touchmove", move, {passive:false});
+  canvas.addEventListener("touchend", end);
+  canvas.addEventListener("mousedown", start);
+  canvas.addEventListener("mousemove", move);
+  window.addEventListener("mouseup", end);
 
-  canvas.addEventListener("touchstart",down,{passive:false});
-  canvas.addEventListener("touchmove",move,{passive:false});
-  canvas.addEventListener("touchend",up);
-  canvas.addEventListener("touchcancel",up);
-
-  sig={
+  window.sig = {
     clear(){
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      ctx.fillStyle="#fff";
-      ctx.fillRect(0,0,canvas.width/ratio,HEIGHT);
-      dirty=true;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0,0,WIDTH,HEIGHT);
+      dirty = false;
     },
-    data(){ return canvas.toDataURL("image/png"); },
-    from(url){
-      const img=new Image();
-      img.onload=()=>{
-        ctx.clearRect(0,0,canvas.width,canvas.height);
-        ctx.fillStyle="#fff";
-        ctx.fillRect(0,0,canvas.width/ratio,HEIGHT);
-        ctx.drawImage(img,0,0,canvas.width/ratio,HEIGHT);
-      };
-      img.src=url;
+    data(){
+      return dirty ? canvas.toDataURL("image/png") : null;
     }
   };
+
+  const btn = document.getElementById("btnSigClear");
+  if(btn) btn.onclick = () => window.sig.clear();
 }
 
 $("#btnPrint").addEventListener("click",()=>printDoc());
