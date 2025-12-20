@@ -230,23 +230,82 @@ function saveCurrent(alertOk){
 
 function initSig(){
   const canvas = document.getElementById("sigPad");
-  if(!canvas) return;
+  if (!canvas) return;
 
   const ctx = canvas.getContext("2d");
+  const HEIGHT = 140; // <<< schmaler Block wie gewünscht
   const ratio = Math.max(window.devicePixelRatio || 1, 1);
-  const HEIGHT = 160;
 
-  function resize(){
+  // feste Größe – KEIN Resize bei Scroll!
+  const width = canvas.offsetWidth;
+  canvas.width  = Math.floor(width * ratio);
+  canvas.height = Math.floor(HEIGHT * ratio);
+  canvas.style.height = HEIGHT + "px";
+
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, width, HEIGHT);
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = "round";
+
+  let drawing = false;
+  let lastX = 0, lastY = 0;
+
+  function pos(e){
     const r = canvas.getBoundingClientRect();
-    canvas.width = Math.floor(r.width * ratio);
-    canvas.height = Math.floor(HEIGHT * ratio);
-    ctx.setTransform(ratio,0,0,ratio,0,0);
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0,0,r.width,HEIGHT);
-    ctx.strokeStyle = "#111";
-    ctx.lineWidth = 2.4;
-    ctx.lineCap = "round";
+    const p = e.touches ? e.touches[0] : e;
+    return { x: p.clientX - r.left, y: p.clientY - r.top };
   }
+
+  function down(e){
+    e.preventDefault();
+    const p = pos(e);
+    drawing = true;
+    lastX = p.x;
+    lastY = p.y;
+  }
+
+  function move(e){
+    if (!drawing) return;
+    e.preventDefault();
+    const p = pos(e);
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    lastX = p.x;
+    lastY = p.y;
+  }
+
+  function up(){
+    drawing = false;
+  }
+
+  // Touch + Maus (bewusst KEINE PointerEvents)
+  canvas.addEventListener("touchstart", down, { passive:false });
+  canvas.addEventListener("touchmove",  move, { passive:false });
+  canvas.addEventListener("touchend",   up);
+
+  canvas.addEventListener("mousedown", down);
+  canvas.addEventListener("mousemove", move);
+  window.addEventListener("mouseup",   up);
+
+  // API für bestehende Logik
+  window.sig = {
+    clear(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle="#fff";
+      ctx.fillRect(0,0,width,HEIGHT);
+    },
+    data(){
+      return canvas.toDataURL("image/png");
+    }
+  };
+
+  const btn = document.getElementById("btnSigClear");
+  if (btn) btn.onclick = () => window.sig.clear();
+}
 
   resize();
 
