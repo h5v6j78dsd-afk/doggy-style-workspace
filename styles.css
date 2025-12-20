@@ -32,17 +32,3 @@ textarea{min-height:88px;resize:vertical}
 #sigPad{width:100%;height:auto;border-radius:16px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.95);touch-action:none}
 .sticky{position:sticky;top:122px;z-index:9}
 .footer{position:fixed;bottom:0;left:0;right:0;padding:10px 14px;background:rgba(12,12,16,.70);border-top:1px solid rgba(255,255,255,.08);backdrop-filter:blur(14px);color:var(--muted);font-size:12px}
-/* === FIX: Signature Canvas iOS / PWA === */
-#sigPad {
-  position: relative;
-  z-index: 10;
-  pointer-events: auto !important;
-  touch-action: none;
-  background: #fff;
-}
-
-/* verhindert Glas-Overlays über dem Canvas */
-.signature,
-.signature * {
-  pointer-events: auto;
-}
