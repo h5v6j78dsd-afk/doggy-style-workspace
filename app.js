@@ -212,13 +212,16 @@ function saveCurrent(alertOk){
   currentDoc.dogId=$("#dogSelect").value;
   currentDoc.fields=fields;
   currentDoc.meta=meta;
-  currentDoc.signatureDataUrl=sig?.data() || currentDoc.signatureDataUrl;
   currentDoc.updatedAt=Date.now();
   const errs=validate(currentDoc,t);
   if(errs.length){
     alert("Bitte noch ausfüllen/abhaken:\n\n• "+errs.join("\n• "));
     return false;
   }
+if (!currentDoc.signatureDataUrl){
+  alert("Bitte unterschreiben");
+  return false;
+}
   saveState();
   dirty=false;
   $("#editorTitle").textContent=currentDoc.title;
@@ -285,7 +288,7 @@ function openSignatureOverlay(onDone){
 document.addEventListener("click",(e)=>{
   if(e.target && e.target.id==="btnSignatureOpen"){
     e.preventDefault();
-    openSignatureOverlay(data=>{ if(currentDoc){ currentDoc.signatureDataUrl=data; dirty=true; } });
+    openSignatureOverlay(data=>{ if(currentDoc){ currentDoc.signatureDataUrl=data; dirty=true; renderForm(currentDoc);} });
   }
 });
 
