@@ -283,7 +283,7 @@ function openSignatureOverlay(onDone){
 }
 
 document.addEventListener("click",(e)=>{
-  if(e.target && e.target.id==="btnSigClear"){
+  if(e.target && e.target.id==="btnSignatureOpen"){
     e.preventDefault();
     openSignatureOverlay(data=>{ if(currentDoc){ currentDoc.signatureDataUrl=data; dirty=true; } });
   }
