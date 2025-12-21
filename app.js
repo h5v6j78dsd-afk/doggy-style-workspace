@@ -133,7 +133,6 @@ function openDoc(id){
   syncDogSelect();
   $("#dogSelect").value=currentDoc.dogId||state.dogs?.[0]?.id||"";
   renderForm(currentDoc);
-  initSig();
   
   $("#dsGvoText").textContent=getTemplate(currentDoc.templateId)?.dsGvoNote||"";
   dirty=false;
