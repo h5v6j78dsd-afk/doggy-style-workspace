@@ -228,29 +228,67 @@ function saveCurrent(alertOk){
   return true;
 }
 
-function initSig(){
-  const canvas=$("#sigPad");
+
+
+// ===== Overlay-Signatur (Weg A) =====
+function openSignatureOverlay(onDone){
+  const overlay=document.createElement("div");
+  overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center";
+  overlay.innerHTML=`
+    <div style="background:#fff;border-radius:14px;padding:12px;width:92%;max-width:560px">
+      <canvas id="sigCanvas" style="width:100%;height:180px;background:#fff;border:1px solid #ccc;border-radius:10px"></canvas>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+        <button id="sigClear">Löschen</button>
+        <button id="sigCancel">Abbrechen</button>
+        <button id="sigOk">Übernehmen</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.body.style.overflow="hidden";
+
+  const canvas=overlay.querySelector("#sigCanvas");
   const ctx=canvas.getContext("2d");
-  const r=canvas.getBoundingClientRect();
-  const ratio=Math.max(devicePixelRatio||1,1);
-  canvas.width=Math.floor(r.width*ratio);
-  canvas.height=Math.floor(r.width*0.288*ratio);
+  const ratio=Math.max(window.devicePixelRatio||1,1);
+  const w=canvas.clientWidth,h=canvas.clientHeight;
+  canvas.width=w*ratio; canvas.height=h*ratio;
   ctx.setTransform(ratio,0,0,ratio,0,0);
-  ctx.fillStyle="#fff"; ctx.fillRect(0,0,r.width,r.width*0.288);
-  let down=false, last=null;
-  const pos=e=>{const b=canvas.getBoundingClientRect(); return {x:e.clientX-b.left, y:e.clientY-b.top};};
-  const draw=(a,b)=>{ctx.strokeStyle="#111"; ctx.lineWidth=2.2; ctx.lineCap="round"; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();};
-  canvas.onpointerdown=e=>{canvas.setPointerCapture(e.pointerId); down=true; last=pos(e); dirty=true;};
-  canvas.onpointermove=e=>{if(!down) return; const p=pos(e); draw(last,p); last=p;};
-  canvas.onpointerup=()=>{down=false; last=null;};
-  canvas.onpointercancel=()=>{down=false; last=null;};
-  sig={
-    clear(){ctx.clearRect(0,0,r.width,r.width*0.288); ctx.fillStyle="#fff"; ctx.fillRect(0,0,r.width,r.width*0.288); dirty=true;},
-    data(){return canvas.toDataURL("image/png");},
-    from(url){const img=new Image(); img.onload=()=>{ctx.clearRect(0,0,r.width,r.width*0.288); ctx.fillStyle="#fff"; ctx.fillRect(0,0,r.width,r.width*0.288); ctx.drawImage(img,0,0,r.width,r.width*0.288);}; img.src=url;}
+  ctx.lineWidth=2.5; ctx.lineCap="round";
+
+  let draw=false,lx=0,ly=0;
+  const pos=e=>{
+    const r=canvas.getBoundingClientRect();
+    const p=e.touches?e.touches[0]:e;
+    return {x:p.clientX-r.left,y:p.clientY-r.top};
   };
-  $("#btnSigClear").onclick=()=>sig.clear();
+  const start=e=>{draw=true;({x:lx,y:ly}=pos(e)); e.preventDefault();};
+  const move=e=>{
+    if(!draw) return;
+    const p=pos(e);
+    ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(p.x,p.y); ctx.stroke();
+    lx=p.x; ly=p.y; e.preventDefault();
+  };
+  const end=()=>draw=false;
+
+  canvas.addEventListener("mousedown",start);
+  canvas.addEventListener("mousemove",move);
+  window.addEventListener("mouseup",end);
+  canvas.addEventListener("touchstart",start,{passive:false});
+  canvas.addEventListener("touchmove",move,{passive:false});
+  canvas.addEventListener("touchend",end);
+
+  overlay.querySelector("#sigClear").onclick=()=>ctx.clearRect(0,0,canvas.width,canvas.height);
+  overlay.querySelector("#sigCancel").onclick=close;
+  overlay.querySelector("#sigOk").onclick=()=>{onDone(canvas.toDataURL("image/png")); close();};
+
+  function close(){document.body.style.overflow=""; overlay.remove();}
 }
+
+document.addEventListener("click",(e)=>{
+  if(e.target && e.target.id==="btnSigClear"){
+    e.preventDefault();
+    openSignatureOverlay(data=>{ if(currentDoc){ currentDoc.signatureDataUrl=data; dirty=true; } });
+  }
+});
 
 $("#btnPrint").addEventListener("click",()=>printDoc());
 function printDoc(){
