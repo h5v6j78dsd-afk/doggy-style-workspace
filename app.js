@@ -3,7 +3,7 @@ const CAPACITY = {
   Urlaubsbetreuung: 10,
   Tagesbetreuung: 12
 };
-const state=loadState()const COMPANY = {
+const state=loadState();const COMPANY = {
   name: "Doggy Style Hundepension",
   owner: "Raphael Boch",
   street: "Im Moos 4",
