@@ -4,10 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Doggy Style Workspace</title>
-<section class="panel">
-  <h2>Heute bei uns</h2>
-  <div id="todayStatus"></div>
-</section>
+
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#101014" />
   <link rel="apple-touch-icon" href="assets/logo.png" />
@@ -26,12 +23,19 @@
       <button class="tab is-active" data-tab="home">Start</button>
       <button class="tab" data-tab="documents">Dokumente</button>
       <button class="tab" data-tab="dogs">Hunde/Kunden</button>
-      <button class="tab" data-tab="settings">Einstellungen</button>
+      <button class="tab" data-tab="settings">Einstellungen</button><button class="tab" data-tab="invoices">Rechnungen</button>
     </nav>
   </header>
 
-  <main class="shell">
     <section class="panel is-active" id="home">
+<div class="card">
+  <h2>Aktuelle Belegung (nächste 14 Tage)</h2>
+  <div id="occupancy"></div>
+</div>
+<div class="card">
+  <h2>Heute bei uns</h2>
+  <div id="todayStatus"></div>
+</div>
       <div class="card hero">
         <h1>Neues Dokument</h1>
         <p>Wähle eine Vorlage, fülle aus, unterschreibe – und speichere als PDF über „Drucken“.</p>
@@ -85,6 +89,11 @@
         </div>
       </div>
     </section>
+<section class="panel" id="invoices">
+  <h2>Rechnungen</h2>
+<div id="invoiceList"></div>
+<div id="invoiceView"></div>
+</section>
 
     <section class="panel" id="editor">
       <div class="card sticky">
@@ -96,6 +105,9 @@
           </div>
           <div class="row">
             <button class="btn" id="btnSave">Speichern</button>
+<button id="btnCreateInvoice" class="btn secondary">
+  🧾 Rechnung erstellen
+</button>
             <button class="btn" id="btnPrint">Als PDF speichern (Drucken)</button>
             <button class="btn" id="btnClose">Schließen</button>
           </div>
@@ -123,10 +135,6 @@
     ✍️ Unterschrift erfassen
   </button>
 </div>
-<section class="panel">
-  <h2>Belegung (nächste 14 Tage)</h2>
-  <div id="occupancy"></div>
-</section>
 
       <div class="card">
         <h2>Datenschutz (DSGVO)</h2>

@@ -3,14 +3,40 @@ const CAPACITY = {
   Urlaubsbetreuung: 10,
   Tagesbetreuung: 12
 };
-const state=loadState();renderOccupancy();renderTodayStatus();
+const state=loadState()const COMPANY = {
+  name: "Doggy Style Hundepension",
+  owner: "Raphael Boch",
+  street: "Im Moos 4",
+  zipCity: "88167 Stiefenhofen",
+  phone: "0170 7313587",
+  email: "info@doggy-style-hundepension.de",
+
+  bank: {
+    name: "Musterbank",
+    iban: "DE00 0000 0000 0000 0000 00",
+    bic: "MUSTERDEFFXXX"
+  },
+
+  tax: {
+    vatId: "",        // falls vorhanden
+    taxNumber: ""     // falls vorhanden
+  },
+
+  paymentTargetDays: 14
+};;if(state.nextInvoiceNumber == null){
+  state.nextInvoiceNumber = 1;
+}renderOccupancy();renderTodayStatus();
 const $=s=>document.querySelector(s);
 const $$=s=>Array.from(document.querySelectorAll(s));
 
 function showPanel(id){
-  $$(".panel").forEach(p=>p.classList.remove("is-active"));
-  const el=document.getElementById(id);
-  if(el) el.classList.add("is-active");
+  document.querySelectorAll(".panel").forEach(p=>{
+    p.classList.toggle("is-active", p.id === id);
+  });
+
+  if(id === "invoices"){
+    renderInvoiceList();
+  }
 }
 
 $$(".tab").forEach(b=>b.addEventListener("click",()=>{
@@ -117,6 +143,192 @@ function renderOccupancy(){
       </tbody>
     </table>
   `;
+}
+function getInvoices(){
+  return state.docs.filter(d => d.type === "invoice");
+}
+function renderInvoiceList(){
+  const el = document.getElementById("invoiceList");
+  if(!el) return;
+
+  const invoices = getInvoices();
+
+  if(!invoices.length){
+    el.innerHTML = "<p>Noch keine Rechnungen vorhanden.</p>";
+    return;
+  }
+
+  el.innerHTML = `
+    <table class="invoice-table">
+     <thead>
+  <tr>
+    <th>Nr.</th>
+    <th>Zeitraum</th>
+    <th>Betrag</th>
+    <th>Status</th>
+  </tr>
+</thead>
+<tbody>
+  ${invoices.map(inv => `
+    <tr onclick="openInvoice('${inv.id}')">
+ <td>${inv.invoiceNumber || "-"}</td>
+      <td>${inv.period.from} – ${inv.period.to}</td>
+      <td>${inv.pricing.total.toFixed(2)} €</td>
+      <td>${inv.status}</td>
+    </tr>
+  `).join("")}
+</tbody>
+    </table>
+  `;
+}
+function openInvoice(id){
+  const inv = state.docs.find(d => d.id === id);
+  if(!inv) return;
+
+  const el = document.getElementById("invoiceView");
+  if(!el) return;
+
+  el.innerHTML = `
+    <div class="card">
+      <h3>Rechnung</h3>
+
+      <p><strong>Zeitraum:</strong>
+        ${inv.period.from} – ${inv.period.to}
+      </p>
+
+<p>
+  <strong>Status:</strong>
+  <span id="invoiceStatus">${inv.status}</span>
+</p>
+<div class="row">
+  <button class="btn" onclick="setInvoiceStatus('${inv.id}','paid')">
+    ✅ Als bezahlt markieren
+  </button>
+
+  <button class="btn secondary" onclick="setInvoiceStatus('${inv.id}','cancelled')">
+    ❌ Stornieren
+  </button>
+</div>
+
+      <hr>
+
+      <p>
+        ${inv.pricing.days} Tage ×
+        ${inv.pricing.daily.toFixed(2)} €
+      </p>
+
+      <p>
+        Grundpreis:
+        ${inv.pricing.base.toFixed(2)} €
+      </p>
+
+      <p>
+        Zuschläge (%):
+        ${inv.pricing.percentExtra}% →
+        ${inv.pricing.percentValue.toFixed(2)} €
+      </p>
+
+      <p>
+        Zuschläge (fix):
+        ${inv.pricing.fixedExtra.toFixed(2)} €
+      </p>
+
+      <hr>
+      <h3>Gesamt:
+        ${inv.pricing.total.toFixed(2)} €
+      </h3>
+<button class="btn" onclick="printInvoice('${inv.id}')">
+  🖨️ Rechnung drucken / PDF
+</button>
+    </div>
+  `;
+}
+function setInvoiceStatus(id, status){
+  const inv = state.docs.find(d => d.id === id);
+  if(!inv) return;
+
+  inv.status = status;
+  saveState();
+
+  openInvoice(id);      // Detailansicht aktualisieren
+  renderInvoiceList(); // Liste aktualisieren
+}
+function printInvoice(id){
+  const inv = state.docs.find(d => d.id === id);
+  if(!inv) return;
+
+  const w = window.open("", "_blank");
+w.document.write(`
+<html>
+<head>
+  <title>Rechnung</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 40px; }
+    h1 { margin-top: 40px; }
+    .header { margin-bottom: 30px; }
+    .small { font-size: 12px; color: #444; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    td, th { border: 1px solid #ccc; padding: 8px; }
+    .right { text-align: right; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <strong>${COMPANY.name}</strong><br>
+    ${COMPANY.owner}<br>
+    ${COMPANY.street}<br>
+    ${COMPANY.zipCity}<br>
+    Tel: ${COMPANY.phone}<br>
+    ${COMPANY.email}<br>
+    ${COMPANY.tax.vatId ? "USt-ID: " + COMPANY.tax.vatId + "<br>" : ""}
+    ${COMPANY.tax.taxNumber ? "Steuernr.: " + COMPANY.tax.taxNumber + "<br>" : ""}
+  </div>
+
+  <h1>Rechnung</h1>
+<p>
+  <strong>Rechnungsnummer:</strong> ${inv.invoiceNumber}<br>
+  <strong>Rechnungsdatum:</strong>
+  ${new Date(inv.invoiceDate).toLocaleDateString()}
+</p>
+
+      <p><strong>Zeitraum:</strong>
+        ${inv.period.from} – ${inv.period.to}
+      </p>
+
+      <table>
+        <tr>
+          <th>Position</th>
+          <th class="right">Betrag</th>
+        </tr>
+        <tr>
+          <td>Grundpreis</td>
+          <td class="right">${inv.pricing.base.toFixed(2)} €</td>
+        </tr>
+        <tr>
+          <td>Zuschläge (%)</td>
+          <td class="right">${inv.pricing.percentValue.toFixed(2)} €</td>
+        </tr>
+        <tr>
+          <td>Zuschläge (fix)</td>
+          <td class="right">${inv.pricing.fixedExtra.toFixed(2)} €</td>
+        </tr>
+        <tr>
+          <th>Gesamt</th>
+          <th class="right">${inv.pricing.total.toFixed(2)} €</th>
+        </tr>
+      </table>
+
+      <script>
+        window.print();
+        window.onafterprint = () => window.close();
+      </script>
+
+    </body>
+    </html>
+  `);
+
+  w.document.close();
 }
 function loadState(){try{const raw=localStorage.getItem(LS_KEY);return raw?JSON.parse(raw):{dogs:[],docs:[]};}catch{return {dogs:[],docs:[]};}}
 function saveState(){localStorage.setItem(LS_KEY,JSON.stringify(state));}
@@ -255,6 +467,7 @@ function renderVersions(doc){
   `;
 }
 function openDoc(id){
+updateCreateInvoiceButton();
   currentDoc=(state.docs||[]).find(d=>d.id===id);
   if(!currentDoc) return;
 normalizeMeta(currentDoc);
@@ -383,7 +596,22 @@ function validate(docObj,t){
   errs.push("Unterschrift");
   return errs;
 }
+function updateCreateInvoiceButton(){
+  const btn = document.getElementById("btnCreateInvoice");
+  if(!btn) return;
+
+  const ok =
+    currentDoc &&
+    currentDoc.saved &&
+    currentDoc.pricing &&
+    !state.docs.some(d =>
+      d.type === "invoice" && d.sourceDocId === currentDoc.id
+    );
+
+  btn.style.display = ok ? "inline-block" : "none";
+}
 function saveCurrent(alertOk){
+updateCreateInvoiceButton();
   if(!currentDoc) return false;
   const t=getTemplate(currentDoc.templateId);
   const {fields, meta}=collectForm();
@@ -429,6 +657,48 @@ renderDocs();
 
 return true;
 
+}
+document.getElementById("btnCreateInvoice")
+  ?.addEventListener("click", () => {
+    if(!currentDoc) return;
+    createInvoiceFromDoc(currentDoc);
+    alert("Rechnung wurde erstellt");
+    updateCreateInvoiceButton();
+  });
+function createInvoiceFromDoc(doc){
+  if(!doc || !doc.pricing) return;
+
+  const year = new Date().getFullYear();
+  const number = String(state.nextInvoiceNumber).padStart(4, "0");
+
+  const invoice = {
+    id: uid(),
+    type: "invoice",
+
+    sourceDocId: doc.id,
+    dogId: doc.dogId,
+
+    period: {
+      from: doc.meta.von,
+      to: doc.meta.bis
+    },
+
+    pricing: doc.pricing,
+
+    status: "draft",
+
+    invoiceNumber: `${year}-${number}`,
+    invoiceDate: new Date().toISOString(),
+
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  state.docs.push(invoice);
+  state.nextInvoiceNumber++;
+
+  saveState();
+  renderInvoiceList();
 }
 function forkDocument() {
   if (!currentDoc || !currentDoc.saved) return;
