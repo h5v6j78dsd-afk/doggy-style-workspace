@@ -71,16 +71,6 @@
       "title": "Betreuung",
       "fields": [
         {
-          "key": "betreuung_art",
-          "label": "Art der Betreuung (Tages-/Urlaubsbetreuung)",
-          "type": "select",
-          "required": true,
-          "options": [
-            "Tagesbetreuung",
-            "Urlaubsbetreuung"
-          ]
-        },
-        {
           "key": "bring",
           "label": "Bringdatum / Uhrzeit",
           "type": "datetime-local",
@@ -128,13 +118,35 @@
     "key": "sig_halter",
     "label": "Unterschrift Hundehalter (Apple Pencil/Finger)"
   },
-  "meta": [
-    {
-      "key": "ort_datum",
-      "label": "Ort / Datum",
-      "type": "text",
-      "required": true
-    }
-  ],
+"meta": [
+  {
+    "key": "betreuung",
+    "label": "Art der Betreuung",
+    "type": "select",
+    "required": true,
+    "options": [
+      "Urlaubsbetreuung",
+      "Tagesbetreuung"
+    ]
+  },
+  {
+    "key": "von",
+    "label": "Betreuung von",
+    "type": "date",
+    "required": true
+  },
+  {
+    "key": "bis",
+    "label": "Betreuung bis",
+    "type": "date",
+    "required": true
+  },
+  {
+    "key": "ort_datum",
+    "label": "Ort / Datum",
+    "type": "text",
+    "required": true
+  }
+],
   "dsGvoNote": "Datenschutz: Die angegebenen personenbezogenen Daten werden ausschließlich zur Betreuung des Hundes und zur Erfüllung gesetzlicher Pflichten verarbeitet. Weitergabe nur an Tierärzte im Notfall. Löschung nach gesetzlichen Aufbewahrungsfristen."
 }
