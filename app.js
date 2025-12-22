@@ -267,6 +267,22 @@ w.document.write(`
 <head>
   <title>Rechnung</title>
   <style>
+
+.print-logo {
+  text-align: center;
+  margin: 20px 0 30px 0;
+}
+.print-logo img {
+  max-width: 280px;
+  width: 100%;
+  height: auto;
+}
+
+/* Print-only adjustments */
+@media print {
+  .print-logo { display: block; }
+}
+
     body { font-family: Arial, sans-serif; padding: 40px; }
     h1 { margin-top: 40px; }
     .header { margin-bottom: 30px; }
@@ -277,6 +293,10 @@ w.document.write(`
   </style>
 </head>
 <body>
+  <div class="print-logo">
+    <img src="assets/logo.png" alt="Doggy Style Hundepension">
+  </div>
+
 
   <div class="header">
     <strong>${COMPANY.name}</strong><br>
