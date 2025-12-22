@@ -3,7 +3,7 @@ const CAPACITY = {
   Urlaubsbetreuung: 10,
   Tagesbetreuung: 12
 };
-const state=loadState();renderOccupancy();
+const state=loadState();renderOccupancy();renderTodayStatus();
 const $=s=>document.querySelector(s);
 const $$=s=>Array.from(document.querySelectorAll(s));
 
@@ -62,6 +62,30 @@ function countForDay(type, day){
 
     return day >= d.meta.von && day <= d.meta.bis;
   }).length;
+}
+function countToday(type){
+  const today = new Date().toISOString().slice(0,10);
+  return countForDay(type, today);
+}
+function renderTodayStatus(){
+  const el = document.getElementById("todayStatus");
+  if(!el) return;
+
+  const u = countToday("Urlaubsbetreuung");
+  const t = countToday("Tagesbetreuung");
+
+  el.innerHTML = `
+    <div class="status-cards">
+      <div class="status-card">
+        <strong>Urlaubsbetreuung</strong><br>
+        ${u} / ${CAPACITY.Urlaubsbetreuung} Hunde
+      </div>
+      <div class="status-card">
+        <strong>Tagesbetreuung</strong><br>
+        ${t} / ${CAPACITY.Tagesbetreuung} Hunde
+      </div>
+    </div>
+  `;
 }
 function renderOccupancy(){
   const el = document.getElementById("occupancy");
@@ -396,7 +420,7 @@ if (!currentDoc.signature){
   currentDoc.saved = true;                             // 🔐 Dokument abschließen
 currentDoc.updatedAt = new Date().toISOString();     // sauberer Zeitstempel
 
-saveState();renderOccupancy();                                         // EINMAL speichern
+saveState();renderOccupancy(); renderTodayStatus();                                         // EINMAL speichern
 dirty = false;
 
 $("#editorTitle").textContent = currentDoc.title;
