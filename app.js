@@ -115,7 +115,7 @@ function createDoc(tid){
   const t=getTemplate(tid);
   if(!t) return;
   const now=Date.now();
-  const docObj={id:uid(),templateId:t.id,templateName:t.name,title:t.name,dogId:state.dogs?.[0]?.id||"",fields:{},signatureDataUrl:"",meta:{ort_datum:""},createdAt:now,updatedAt:now};
+  const docObj={id:uid(),templateId:t.id,templateName:t.name,title:t.name,dogId:state.dogs?.[0]?.id||"",fields:{},signature: null,meta:{ort_datum:""},createdAt:now,updatedAt:now};
   state.docs=state.docs||[];
   state.docs.unshift(docObj);
   saveState();
@@ -155,6 +155,25 @@ function renderForm(docObj){
   meta.innerHTML=`<h2>Ort / Datum</h2>`;
   t.meta.forEach(f=>meta.appendChild(renderField(f, docObj.meta[f.key])));
   root.appendChild(meta);
+const sigCard = document.createElement("div");
+sigCard.className = "card";
+
+const sig = docObj.signature;
+
+sigCard.innerHTML = `
+  <h2>Unterschrift</h2>
+  ${
+    sig
+      ? `<p class="muted">
+           ✔ Unterschrieben am ${new Date(sig.signedAt).toLocaleString("de-DE")}
+         </p>`
+      : `<button id="btnSignatureOpen" class="primary">
+           ✍️ Unterschrift erfassen
+         </button>`
+  }
+`;
+
+root.appendChild(sigCard);
 }
 function renderField(f,value){
   const wrap=document.createElement("label");
@@ -201,7 +220,8 @@ function validate(docObj,t){
     else { if(!v || String(v).trim()==="") errs.push(f.label); }
   }));
   t.meta.forEach(f=>{ if(f.required){const v=docObj.meta[f.key]; if(!v||String(v).trim()==="") errs.push(f.label);} });
-  if(!docObj.signatureDataUrl || docObj.signatureDataUrl.length<800) errs.push("Unterschrift");
+  if(!docObj.signature || !docObj.signature.dataUrl)
+  errs.push("Unterschrift");
   return errs;
 }
 function saveCurrent(alertOk){
@@ -218,7 +238,7 @@ function saveCurrent(alertOk){
     alert("Bitte noch ausfüllen/abhaken:\n\n• "+errs.join("\n• "));
     return false;
   }
-if (!currentDoc.signatureDataUrl){
+if (!currentDoc.signature){
   alert("Bitte unterschreiben");
   return false;
 }
@@ -288,7 +308,13 @@ function openSignatureOverlay(onDone){
 document.addEventListener("click",(e)=>{
   if(e.target && e.target.id==="btnSignatureOpen"){
     e.preventDefault();
-    openSignatureOverlay(data=>{ if(currentDoc){ currentDoc.signatureDataUrl=data; dirty=true; renderForm(currentDoc);} });
+    openSignatureOverlay(data=>{ if(currentDoc){ currentDoc.signature = {
+  dataUrl: data,
+  signedAt: new Date().toISOString(),
+  dogId: currentDoc.dogId || null
+};
+dirty = true;
+renderForm(currentDoc);} });
   }
 });
 
@@ -309,7 +335,9 @@ function printDoc(){
 function buildPrintHtml(docObj,t,dog){
   const dt=new Date(docObj.updatedAt).toLocaleString("de-DE");
   const dogLine=dog && !dog.isPlaceholder ? `${dog.owner?escapeHtml(dog.owner)+" – ":""}${escapeHtml(dog.name)}` : "—";
-  const sigImg=docObj.signatureDataUrl?`<img class="sig" src="${docObj.signatureDataUrl}" alt="Unterschrift" />`:"";
+  const sigImg = docObj.signature
+  ? `<img class="sig" src="${docObj.signature.dataUrl}" alt="Unterschrift" />`
+  : "";
   let out=`<div class="head"><div><h1>${escapeHtml(docObj.title||t.name)}</h1><div class="meta">Hund/Kunde: ${dogLine} · Stand: ${dt}</div></div><img class="logo" src="assets/logo.png" /></div>`;
   t.sections.forEach(sec=>{
     out+=`<h2>${escapeHtml(sec.title)}</h2><table>`;
