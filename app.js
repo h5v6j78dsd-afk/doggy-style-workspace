@@ -1,5 +1,9 @@
 const LS_KEY="ds_workspace_v1";
-const state=loadState();
+const CAPACITY = {
+  Urlaubsbetreuung: 10,
+  Tagesbetreuung: 12
+};
+const state=loadState();renderOccupancy();
 const $=s=>document.querySelector(s);
 const $$=s=>Array.from(document.querySelectorAll(s));
 
@@ -24,6 +28,72 @@ const getTemplate=id=>templates.find(t=>t.id===id);
 
 function uid(){return Math.random().toString(16).slice(2)+Date.now().toString(16);}
 function escapeHtml(s){return String(s??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");}
+function overlaps(aFrom, aTo, bFrom, bTo){
+  return !(aTo < bFrom || aFrom > bTo);
+}
+
+function countOccupancy(type, from, to, excludeDocId){
+  return state.docs.filter(d=>{
+    if(!d.saved) return false;
+    if(d.id === excludeDocId) return false;
+    if(d.meta?.betreuung !== type) return false;
+    if(!d.meta?.von || !d.meta?.bis) return false;
+
+    return overlaps(d.meta.von, d.meta.bis, from, to);
+  }).length;
+}
+function getNextDays(n){
+  const days = [];
+  const d = new Date();
+
+  for(let i = 0; i < n; i++){
+    const x = new Date(d);
+    x.setDate(d.getDate() + i);
+    days.push(x.toISOString().slice(0,10));
+  }
+
+  return days;
+}
+function countForDay(type, day){
+  return state.docs.filter(d=>{
+    if(!d.saved) return false;
+    if(d.meta?.betreuung !== type) return false;
+    if(!d.meta?.von || !d.meta?.bis) return false;
+
+    return day >= d.meta.von && day <= d.meta.bis;
+  }).length;
+}
+function renderOccupancy(){
+  const el = document.getElementById("occupancy");
+  if(!el) return;
+
+  const days = getNextDays(14);
+
+  el.innerHTML = `
+    <table class="occ-table">
+      <thead>
+        <tr>
+          <th>Datum</th>
+          <th>Urlaubsbetreuung</th>
+          <th>Tagesbetreuung</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${days.map(day=>{
+          const u = countForDay("Urlaubsbetreuung", day);
+          const t = countForDay("Tagesbetreuung", day);
+          return `
+            <tr>
+              <td>${day}</td>
+              <td>${u} / ${CAPACITY.Urlaubsbetreuung}</td>
+              <td>${t} / ${CAPACITY.Tagesbetreuung}</td>
+            </tr>
+          `;
+        }).join("")}
+      </tbody>
+    </table>
+  `;
+}
 function loadState(){try{const raw=localStorage.getItem(LS_KEY);return raw?JSON.parse(raw):{dogs:[],docs:[]};}catch{return {dogs:[],docs:[]};}}
 function saveState(){localStorage.setItem(LS_KEY,JSON.stringify(state));}
 
@@ -114,8 +184,13 @@ $("#btnNewDoc").addEventListener("click",()=>createDoc($("#templateSelect").valu
 function createDoc(tid){
   const t=getTemplate(tid);
   if(!t) return;
-  const now=Date.now();
-  const docObj={id:uid(),templateId:t.id,templateName:t.name,title:t.name,dogId:state.dogs?.[0]?.id||"",fields:{},signature: null,meta:{ort_datum:""},createdAt:now,updatedAt:now};
+  const now = new Date().toISOString();
+  const docObj={id:uid(),templateId:t.id,templateName:t.name,title:t.name,dogId:state.dogs?.[0]?.id||"",fields:{},signature: null,saved: false,
+versionOf: null,meta: {
+  betreuung: "",
+  von: "",
+  bis: ""
+},createdAt:now,updatedAt:now};
   state.docs=state.docs||[];
   state.docs.unshift(docObj);
   saveState();
@@ -123,16 +198,49 @@ function createDoc(tid){
 }
 
 let currentDoc=null, dirty=false;
+function normalizeMeta(doc){
+  doc.meta = doc.meta || {};
+  doc.meta.betreuung = doc.meta.betreuung || "";
+  doc.meta.von = doc.meta.von || "";
+  doc.meta.bis = doc.meta.bis || "";
+}
+function renderVersions(doc){
+  const box = document.getElementById("versionBox");
+  if(!box) return;
 
+  const versions = getDocumentVersions(doc);
+
+  if(versions.length <= 1){
+    box.innerHTML = "<strong>Versionen:</strong> Nur diese Version vorhanden.";
+    return;
+  }
+
+  box.innerHTML = `
+    <strong>Versionen:</strong>
+    <ul style="margin:6px 0 0 16px">
+      ${versions.map((v,i)=>`
+        <li>
+          ${v.id === doc.id ? "➡️ <strong>" : ""}
+          Version ${i+1}
+          (${new Date(v.createdAt).toLocaleString("de-DE")})
+          ${v.saved ? "✔️" : "✏️"}
+          ${v.id === doc.id ? "</strong>" : ""}
+        </li>
+      `).join("")}
+    </ul>
+  `;
+}
 function openDoc(id){
   currentDoc=(state.docs||[]).find(d=>d.id===id);
   if(!currentDoc) return;
+normalizeMeta(currentDoc);
   $("#editorTitle").textContent=currentDoc.title||"Dokument";
   $("#editorMeta").textContent=currentDoc.templateName;
   $("#docName").value=currentDoc.title||"";
   syncDogSelect();
   $("#dogSelect").value=currentDoc.dogId||state.dogs?.[0]?.id||"";
   renderForm(currentDoc);
+renderVersions(currentDoc);
   
   $("#dsGvoText").textContent=getTemplate(currentDoc.templateId)?.dsGvoNote||"";
   dirty=false;
@@ -185,13 +293,40 @@ function renderField(f,value){
   else if(f.type==="checkbox"){ input=document.createElement("input"); input.type="checkbox"; input.checked=!!value; input.style.width="22px"; input.style.height="22px"; }
   else { input=document.createElement("input"); input.type=f.type||"text"; input.value=value||""; }
   input.dataset.key=f.key; input.dataset.ftype=f.type;
-  input.oninput=()=>dirty=true; input.onchange=()=>dirty=true;
-  wrap.appendChild(input);
+  input.oninput = () => {
+  if (currentDoc.saved) {
+    forkDocument();
+  }
+  dirty = true;
+};
+
+input.onchange = () => {
+  if (currentDoc.saved) {
+    forkDocument();
+  }
+  dirty = true;
+};
+if (currentDoc.saved) {
+  input.disabled = true;
+}
+  
+wrap.appendChild(input);
   return wrap;
 }
 
-$("#docName").addEventListener("input",()=>dirty=true);
-$("#dogSelect").addEventListener("change",()=>dirty=true);
+$("#docName").addEventListener("input", () => {
+  if (currentDoc.saved) {
+    forkDocument();
+  }
+  dirty = true;
+});
+
+$("#dogSelect").addEventListener("change", () => {
+  if (currentDoc.saved) {
+    forkDocument();
+  }
+  dirty = true;
+});
 
 $("#btnSave").addEventListener("click",()=>saveCurrent(true));
 $("#btnClose").addEventListener("click",()=>{
@@ -232,25 +367,73 @@ function saveCurrent(alertOk){
   currentDoc.dogId=$("#dogSelect").value;
   currentDoc.fields=fields;
   currentDoc.meta=meta;
-  currentDoc.updatedAt=Date.now();
+$("#docName").disabled = currentDoc.saved;
+$("#dogSelect").disabled = currentDoc.saved;
+  
   const errs=validate(currentDoc,t);
   if(errs.length){
     alert("Bitte noch ausfüllen/abhaken:\n\n• "+errs.join("\n• "));
     return false;
   }
+const type = currentDoc.meta.betreuung;
+const from = currentDoc.meta.von;
+const to   = currentDoc.meta.bis;
+
+const used = countOccupancy(type, from, to, currentDoc.id);
+const limit = CAPACITY[type];
+
+if (used >= limit) {
+  alert(
+    `⚠️ Achtung:\n\n` +
+    `${used} von ${limit} Plätzen für "${type}" ` +
+    `im Zeitraum ${from} – ${to} sind bereits belegt.`
+  );
+}
 if (!currentDoc.signature){
   alert("Bitte unterschreiben");
   return false;
 }
-  saveState();
-  dirty=false;
-  $("#editorTitle").textContent=currentDoc.title;
-  if(alertOk) alert("Gespeichert ✅");
-  renderDocs();
-  return true;
+  currentDoc.saved = true;                             // 🔐 Dokument abschließen
+currentDoc.updatedAt = new Date().toISOString();     // sauberer Zeitstempel
+
+saveState();renderOccupancy();                                         // EINMAL speichern
+dirty = false;
+
+$("#editorTitle").textContent = currentDoc.title;
+if(alertOk) alert("Gespeichert");
+renderDocs();
+
+return true;
+
 }
+function forkDocument() {
+  if (!currentDoc || !currentDoc.saved) return;
 
+  const originalId = currentDoc.versionOf || currentDoc.id;
 
+  const fork = JSON.parse(JSON.stringify(currentDoc));
+
+  fork.id = uid();
+  fork.saved = false;
+  fork.versionOf = originalId;
+  fork.createdAt = new Date().toISOString();
+  fork.updatedAt = fork.createdAt;
+
+  // neue Version → neue Unterschrift erforderlich
+  fork.signature = null;
+
+  state.docs.unshift(fork);
+  currentDoc = fork;
+
+  saveState();
+}
+function getDocumentVersions(doc){
+  const rootId = doc.versionOf || doc.id;
+
+  return (state.docs || [])
+    .filter(d => d.id === rootId || d.versionOf === rootId)
+    .sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
+}
 
 // ===== Overlay-Signatur (Weg A) =====
 function openSignatureOverlay(onDone){
