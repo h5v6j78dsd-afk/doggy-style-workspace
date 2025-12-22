@@ -28,6 +28,10 @@ const state=loadState();const COMPANY = {
 }renderOccupancy();renderTodayStatus();
 const $=s=>document.querySelector(s);
 const $$=s=>Array.from(document.querySelectorAll(s));
+function formatDateDE(dateStr){
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("de-DE");
+}
 
 function showPanel(id){
   document.querySelectorAll(".panel").forEach(p=>{
@@ -134,7 +138,7 @@ function renderOccupancy(){
           const t = countForDay("Tagesbetreuung", day);
           return `
             <tr>
-              <td>${day}</td>
+              <td>${formatDateDE(day)}</td>
               <td>${u} / ${CAPACITY.Urlaubsbetreuung}</td>
               <td>${t} / ${CAPACITY.Tagesbetreuung}</td>
             </tr>
