@@ -889,7 +889,7 @@ function renderEditor(doc){
 }
 
 function renderInvoiceEditor(doc, template){
-  const editor = document.getElementById("editor");
+  const editor = document.getElementById("editorContent");
   editor.innerHTML = "";
   const data = doc.data || {};
   doc.data = data;
