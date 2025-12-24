@@ -888,10 +888,19 @@ $("#btnWipe").addEventListener("click",()=>{
 // ===== B1 Rechnung Editor =====
 function renderEditor(doc){
   const template = getTemplate(doc.templateId);
-  if(template && template.type === "invoice"){
+
+  if (!template) {
+    console.warn("Template nicht gefunden:", doc.templateId);
+    return;
+  }
+
+  // Rechnung explizit abfangen
+  if (template.id === "rechnung") {
     renderInvoiceEditor(doc, template);
     return;
   }
+
+  // Standard: normale Formulare (Hundeannahme etc.)
   renderForm(doc);
 }
 
