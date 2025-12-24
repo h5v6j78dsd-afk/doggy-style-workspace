@@ -1,0 +1,85 @@
+{
+  "type": "invoice",
+  "title": "Rechnung",
+  "fields": [
+    {
+      "key": "customer",
+      "label": "Kunde",
+      "type": "readonly"
+    },
+    {
+      "key": "dog",
+      "label": "Hund",
+      "type": "readonly"
+    },
+    {
+      "key": "careType",
+      "label": "Betreuung",
+      "type": "select",
+      "options": [
+        {
+          "value": "day",
+          "label": "Tagesbetreuung"
+        },
+        {
+          "value": "vacation",
+          "label": "Urlaubsbetreuung"
+        }
+      ]
+    },
+    {
+      "key": "fromDate",
+      "label": "Von",
+      "type": "date"
+    },
+    {
+      "key": "toDate",
+      "label": "Bis",
+      "type": "date"
+    }
+  ],
+  "surcharges": [
+    {
+      "key": "holiday",
+      "label": "Feiertagszuschlag",
+      "type": "percent",
+      "value": 10
+    },
+    {
+      "key": "special_times",
+      "label": "Sonderbring- / Holzeiten",
+      "type": "percent",
+      "value": 10
+    },
+    {
+      "key": "extra_care",
+      "label": "Erhöhter Pflegeaufwand",
+      "type": "percent",
+      "value": 10
+    },
+    {
+      "key": "medication",
+      "label": "Medikamentengabe",
+      "type": "perDay",
+      "price": 2
+    },
+    {
+      "key": "walk_extra",
+      "label": "Gassi-Extrarunde (30 Min)",
+      "type": "quantity",
+      "price": 15
+    },
+    {
+      "key": "bandage",
+      "label": "Verbandwechsel",
+      "type": "quantity",
+      "price": 2.5
+    },
+    {
+      "key": "grooming",
+      "label": "Fell- / Klauenpflege",
+      "type": "quantity",
+      "price": 5
+    }
+  ]
+}
