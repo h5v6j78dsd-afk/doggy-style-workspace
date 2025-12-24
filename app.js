@@ -50,9 +50,13 @@ $$(".tab").forEach(b=>b.addEventListener("click",()=>{
 
 let templates=[];
 async function loadTemplates(){
-  const res=await fetch("templates/hundeannahme.json");
-  templates=[await res.json()];
-  $("#templateSelect").innerHTML=templates.map(t=>`<option value="${t.id}">${t.name}</option>`).join("");
+  const res1 = await fetch("templates/hundeannahme.json");
+  const res2 = await fetch("templates/rechnung.json");
+  const t1 = await res1.json();
+  const t2 = await res2.json();
+  templates = [t1, t2];
+  $("#templateSelect").innerHTML = templates.map(t=>`<option value="${t.id}">${t.name}</option>`).join("");
+}">${t.name}</option>`).join("");
 }
 const getTemplate=id=>templates.find(t=>t.id===id);
 
@@ -267,22 +271,6 @@ w.document.write(`
 <head>
   <title>Rechnung</title>
   <style>
-
-.print-logo {
-  text-align: center;
-  margin: 20px 0 30px 0;
-}
-.print-logo img {
-  max-width: 280px;
-  width: 100%;
-  height: auto;
-}
-
-/* Print-only adjustments */
-@media print {
-  .print-logo { display: block; }
-}
-
     body { font-family: Arial, sans-serif; padding: 40px; }
     h1 { margin-top: 40px; }
     .header { margin-bottom: 30px; }
@@ -293,10 +281,6 @@ w.document.write(`
   </style>
 </head>
 <body>
-  <div class="print-logo">
-    <img src="assets/logo.png" alt="Doggy Style Hundepension">
-  </div>
-
 
   <div class="header">
     <strong>${COMPANY.name}</strong><br>
@@ -500,7 +484,7 @@ normalizeMeta(currentDoc);
   $("#docName").value=currentDoc.title||"";
   syncDogSelect();
   $("#dogSelect").value=currentDoc.dogId||state.dogs?.[0]?.id||"";
-  renderForm(currentDoc);
+  renderEditor(currentDoc);
 renderVersions(currentDoc);
   
   $("#dsGvoText").textContent=getTemplate(currentDoc.templateId)?.dsGvoNote||"";
@@ -894,3 +878,78 @@ $("#btnWipe").addEventListener("click",()=>{
   renderDocs();
   showPanel("home");
 })();
+// ===== B1 Rechnung Editor =====
+function renderEditor(doc){
+  const template = getTemplate(doc.templateId);
+  if(template && template.type === "invoice"){
+    renderInvoiceEditor(doc, template);
+    return;
+  }
+  renderForm(doc);
+}
+
+function renderInvoiceEditor(doc, template){
+  const editor = document.getElementById("editor");
+  editor.innerHTML = "";
+  const data = doc.data || {};
+  doc.data = data;
+
+  template.fields.forEach(field=>{
+    const div=document.createElement("div");
+    div.className="field";
+    const label=document.createElement("label");
+    label.textContent=field.label;
+    div.appendChild(label);
+
+    let input;
+    if(field.type==="readonly"){
+      input=document.createElement("input");
+      input.value=data[field.key]||"";
+      input.disabled=true;
+    } else if(field.type==="select"){
+      input=document.createElement("select");
+      field.options.forEach(o=>{
+        const opt=document.createElement("option");
+        opt.value=o.value; opt.textContent=o.label;
+        input.appendChild(opt);
+      });
+      input.value=data[field.key]||field.options[0].value;
+      input.onchange=()=>{data[field.key]=input.value; updatePriceBlock();};
+    } else {
+      input=document.createElement("input");
+      input.type=field.type;
+      input.value=data[field.key]||"";
+      input.oninput=()=>{data[field.key]=input.value; updatePriceBlock();};
+    }
+    div.appendChild(input);
+    editor.appendChild(div);
+  });
+
+  const h=document.createElement("h3"); h.textContent="Zuschläge"; editor.appendChild(h);
+  template.surcharges.forEach(s=>{
+    const row=document.createElement("div"); row.className="surcharge-row";
+    const check=document.createElement("input"); check.type="checkbox";
+    const lab=document.createElement("span"); lab.textContent=s.label;
+    row.appendChild(check); row.appendChild(lab);
+
+    if(s.type==="quantity"){
+      const qty=document.createElement("input"); qty.type="number"; qty.min=0; qty.value=0; qty.style.display="none";
+      check.onchange=()=>{qty.style.display=check.checked?"inline-block":"none"; updatePriceBlock();};
+      qty.oninput=updatePriceBlock; row.appendChild(qty);
+    } else {
+      check.onchange=updatePriceBlock;
+    }
+    editor.appendChild(row);
+  });
+
+  const priceBlock=document.createElement("div");
+  priceBlock.id="price-block";
+  priceBlock.innerHTML='<strong>Gesamtbetrag:</strong> <span id="total-price">–</span>';
+  editor.appendChild(priceBlock);
+}
+
+function updatePriceBlock(){
+  const el=document.getElementById("total-price");
+  if(el) el.textContent="wird berechnet…";
+}
+// ===== Ende B1 =====
