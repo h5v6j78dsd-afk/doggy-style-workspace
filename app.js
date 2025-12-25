@@ -1078,6 +1078,8 @@ const tbody = document.getElementById("invItems");
 
 // ===== AKTIVER Editor-Switch (B2.x) =====
 function renderEditor(doc){
+  try { if(arguments[0] && arguments[0].type === "rechnung") calculateInvoiceTotals(arguments[0]); } catch(e){ console.error("Rechnung Berechnung Fehler:", e); }
+
   const template = getTemplate(doc.templateId);
   if(!template) return;
   safeRenderEditor(template, doc);
@@ -1170,4 +1172,29 @@ function safeRenderEditor(template, doc){
       root.innerHTML = "<p style='color:red'>Dieses Dokument kann derzeit nicht angezeigt werden.</p>";
     }
   }
+}
+
+
+/* ===== Rechnung: Cent-basierte Rechenlogik ===== */
+function calculateInvoiceTotals(invoice){
+  if(!invoice || invoice.type !== "rechnung") return invoice;
+  let netto = 0;
+  (invoice.positionen || []).forEach(pos => {
+    const menge = Number(pos.menge || 0);
+    const preis = Number(pos.einzelpreisCent || 0);
+    netto += menge * preis;
+  });
+  const mwst = Math.round(netto * 0.19);
+  const brutto = netto + mwst;
+  invoice.summen = {
+    nettoCent: netto,
+    mwstCent: mwst,
+    bruttoCent: brutto
+  };
+  return invoice;
+}
+
+function formatEuroFromCent(cent){
+  const v = Number(cent||0) / 100;
+  return v.toFixed(2).replace(".", ",") + " €";
 }
