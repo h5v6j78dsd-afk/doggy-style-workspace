@@ -1080,12 +1080,8 @@ const tbody = document.getElementById("invItems");
 function renderEditor(doc){
   const template = getTemplate(doc.templateId);
   if(!template) return;
-
-  // 🧾 Freie Rechnung → B2 Editor
-  if(template.id === "rechnung" && !doc.sourceDocId){
-    renderInvoiceEditorB2(doc);
-    return;
-  }
+  safeRenderEditor(template, doc);
+}
 
   // 📄 Rechnung aus Betreuung → Anzeige
   if(template.id === "rechnung" && doc.sourceDocId){
@@ -1157,3 +1153,21 @@ function updatePriceBlock(){
   if(el) el.textContent="wird berechnet…";
 }
 // ===== Ende B1 =====
+
+
+// ===== Phase C: Safe Editor Wrapper =====
+function safeRenderEditor(template, doc){
+  try{
+    if(template && Array.isArray(template.sections)){
+      renderSectionsEditor(template, doc);
+    } else {
+      renderForm(doc);
+    }
+  } catch(e){
+    console.error("Editor-Fehler:", e);
+    const root = document.getElementById("formRoot");
+    if(root){
+      root.innerHTML = "<p style='color:red'>Dieses Dokument kann derzeit nicht angezeigt werden.</p>";
+    }
+  }
+}
