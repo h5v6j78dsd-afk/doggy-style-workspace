@@ -1,5 +1,77 @@
 const LS_KEY="ds_workspace_v1";
 const CAPACITY = {
+
+// ===== PREISLOGIK & STAFFELUNGEN =====
+const PRICE_RULES = {
+  Tagesbetreuung: [
+    { min: 30, price: 30 },
+    { min: 14, price: 35 },
+    { min: 7,  price: 37.5 },
+    { min: 1,  price: 40 }
+  ],
+  Urlaubsbetreuung: [
+    { min: 30, price: 35 },
+    { min: 14, price: 40 },
+    { min: 7,  price: 42.5 },
+    { min: 1,  price: 45 }
+  ]
+};
+
+function daysBetween(from, to){
+  const ms = new Date(to) - new Date(from);
+  return Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+}
+
+function getPricePerDay(type, days){
+  const rules = PRICE_RULES[type] || [];
+  for(const r of rules){
+    if(days >= r.min) return r.price;
+  }
+  return 0;
+}
+
+function calculateInvoicePricing(doc){
+  const meta = doc.meta || {};
+  const f = doc.fields || {};
+
+  if(!meta.betreuung || !meta.von || !meta.bis){
+    return null;
+  }
+
+  const days = daysBetween(meta.von, meta.bis);
+  const daily = getPricePerDay(meta.betreuung, days);
+  const base = days * daily;
+
+  let percentExtra = 0;
+  let fixedExtra = 0;
+
+  if(f.holiday) percentExtra += 10;
+  if(f.special_times) percentExtra += 10;
+  if(f.extra_care) percentExtra += 10;
+
+  const percentValue = base * (percentExtra / 100);
+
+  if(f.medication) fixedExtra += days * 2;
+  if(f.walk_extra_count) fixedExtra += f.walk_extra_count * 15;
+  if(f.bandage_count) fixedExtra += f.bandage_count * 2.5;
+  if(f.grooming_count) fixedExtra += f.grooming_count * 5;
+
+  const total = Math.round((base + percentValue + fixedExtra) * 100) / 100;
+
+  doc.pricing = {
+    days,
+    daily,
+    base,
+    percentExtra,
+    percentValue,
+    fixedExtra,
+    total
+  };
+
+  return doc.pricing;
+}
+// ===== ENDE PREISLOGIK =====
+
   Urlaubsbetreuung: 10,
   Tagesbetreuung: 12
 };
@@ -633,6 +705,13 @@ updateCreateInvoiceButton();
   currentDoc.title=$("#docName").value.trim()||currentDoc.templateName;
   currentDoc.dogId=$("#dogSelect").value;
   currentDoc.fields=fields;
+currentDoc.meta=meta;
+
+// 🔢 Preislogik anwenden
+if (currentDoc.meta?.betreuung && currentDoc.meta?.von && currentDoc.meta?.bis) {
+  calculateInvoicePricing(currentDoc);
+}
+
   currentDoc.meta=meta;
 $("#docName").disabled = currentDoc.saved;
 $("#dogSelect").disabled = currentDoc.saved;
