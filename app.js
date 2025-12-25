@@ -964,24 +964,139 @@ $("#btnWipe").addEventListener("click",()=>{
   renderDocs();
   showPanel("home");
 })();
-// ===== B1 Rechnung Editor =====
+
+/* ===== B2.2a Freier Rechnungs-Editor ===== */
+function renderInvoiceEditorB2(doc){
+  // ===== B2.2c Rechnungsnummer (Pflichtfeld) =====
+
+  // ===== B2.3 Zahlungsstatus =====
+  if(!doc.paymentStatus){
+    doc.paymentStatus = "offen"; // offen | bezahlt | storniert
+  }
+
+  if(!doc.invoiceNumber || String(doc.invoiceNumber).trim()===""){
+    const year = new Date().getFullYear();
+    const count = (state.docs||[]).filter(d=>d.type==="invoice").length + 1;
+    doc.invoiceNumber = `${year}-${String(count).padStart(4,"0")}`;
+  }
+
+  const root = document.getElementById("formRoot");
+  if(!root) return;
+
+  // Basisfelder
+  doc.items = Array.isArray(doc.items) ? doc.items : [];
+  doc.date = doc.date || new Date().toISOString().slice(0,10);
+
+  function recalc(){
+    let net = 0;
+    doc.items.forEach(it=>{
+      const q = Number(it.qty)||0;
+      const p = Number(it.unitPrice)||0;
+      it.sum = Math.round(q*p*100)/100;
+      net += it.sum;
+    });
+    doc.net = Math.round(net*100)/100;
+    doc.tax = Math.round(doc.net*0.19*100)/100;
+    doc.total = Math.round((doc.net+doc.tax)*100)/100;
+  }
+
+  function redraw(){
+    recalc();
+    renderInvoiceEditorB2(doc);
+  }
+
+  recalc();
+
+  root.innerHTML = `
+    <h2>Freie Rechnung</h2>
+    <label class="field"><span>Rechnungsnummer *</span>
+      <input id="invoiceNumberInput" required />
+    </label>
+    <label class="field"><span>Zahlungsstatus</span>
+      <select id="paymentStatusSelect">
+        <option value="offen">offen</option>
+        <option value="bezahlt">bezahlt</option>
+        <option value="storniert">storniert</option>
+      </select>
+    </label>
+    <p><strong>Datum:</strong> ${doc.date}</p>
+
+    <table class="invoice-table">
+      <thead>
+        <tr>
+          <th>Position</th>
+          <th>Menge</th>
+          <th>Einzelpreis</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="invItems"></tbody>
+    </table>
+
+    <button id="addInvItem">+ Position hinzufügen</button>
+    <hr>
+    <p>Netto: ${doc.net.toFixed(2)} €</p>
+    <p>MwSt (19%): ${doc.tax.toFixed(2)} €</p>
+    <p><strong>Brutto: ${doc.total.toFixed(2)} €</strong></p>
+  `;
+
+  const numInput = document.getElementById("invoiceNumberInput");
+  const paySel = document.getElementById("paymentStatusSelect");
+  if(paySel){
+    paySel.value = doc.paymentStatus || "offen";
+    paySel.onchange = e=>{ doc.paymentStatus = e.target.value; };
+  }
+
+  if(numInput){
+    numInput.value = doc.invoiceNumber;
+    numInput.oninput = e=>{ doc.invoiceNumber = e.target.value.trim(); };
+  }
+const tbody = document.getElementById("invItems");
+  doc.items.forEach((it,i)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><input value="${it.text||""}"></td>
+      <td><input type="number" step="1" value="${it.qty||1}"></td>
+      <td><input type="number" step="0.01" value="${it.unitPrice||0}"></td>
+      <td><button>x</button></td>
+    `;
+    const inputs = tr.querySelectorAll("input");
+    inputs[0].oninput=e=>{it.text=e.target.value;};
+    inputs[1].oninput=e=>{it.qty=e.target.value; redraw();};
+    inputs[2].oninput=e=>{it.unitPrice=e.target.value; redraw();};
+    tr.querySelector("button").onclick=()=>{doc.items.splice(i,1); redraw();};
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById("addInvItem").onclick=()=>{
+    doc.items.push({text:"", qty:1, unitPrice:0});
+    redraw();
+  };
+}
+/* ===== Ende B2.2a ===== */
+
+
+// ===== AKTIVER Editor-Switch (B2.x) =====
 function renderEditor(doc){
   const template = getTemplate(doc.templateId);
+  if(!template) return;
 
-  if (!template) {
-    console.warn("Template nicht gefunden:", doc.templateId);
+  // 🧾 Freie Rechnung → B2 Editor
+  if(template.id === "rechnung" && !doc.sourceDocId){
+    renderInvoiceEditorB2(doc);
     return;
   }
 
-  // Rechnung explizit abfangen
-  if (template.id === "rechnung") {
-    renderInvoiceEditor(doc, template);
+  // 📄 Rechnung aus Betreuung → Anzeige
+  if(template.id === "rechnung" && doc.sourceDocId){
+    openInvoice(doc.id);
     return;
   }
 
-  // Standard: normale Formulare (Hundeannahme etc.)
+  // 🐶 Standard-Dokumente (z. B. Hundeannahme)
   renderForm(doc);
 }
+
 
 function renderInvoiceEditor(doc, template){
   const root = document.getElementById("formRoot");
