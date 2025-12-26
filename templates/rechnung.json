@@ -1,7 +1,7 @@
 {
   "id": "rechnung",
   "title": "Rechnung",
-  "type": "invoice",
+  "type": "rechnung",
   "version": "1.0",
   "taxRate": 0.19,
 
