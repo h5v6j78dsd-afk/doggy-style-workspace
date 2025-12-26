@@ -106,6 +106,35 @@
           "required": true
         }
       ]
+    },
+    {
+      "title": "Aufschläge",
+      "fields": [
+        {
+          "key": "holiday",
+          "label": "Feiertag / Feiertagsbetreuung (+10%)",
+          "type": "checkbox",
+          "required": false
+        },
+        {
+          "key": "special_times",
+          "label": "Sonderzeiten / Sonderaufwand (+10%)",
+          "type": "checkbox",
+          "required": false
+        },
+        {
+          "key": "extra_care",
+          "label": "Besondere Betreuung (+10%)",
+          "type": "checkbox",
+          "required": false
+        },
+        {
+          "key": "grooming_count",
+          "label": "Pflege/Extra (Anzahl × 5€)",
+          "type": "number",
+          "required": false
+        }
+      ]
     }
   ],
   "signature": {
