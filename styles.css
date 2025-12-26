@@ -44,3 +44,18 @@ textarea{min-height:88px;resize:vertical}
 .opt > summary{cursor:pointer;color:#333;font-weight:600;}
 .field input:disabled,.field textarea:disabled,.field select:disabled{opacity:0.85;}
 .readonlyField input,.readonlyField textarea{background:#f4f4f4;}
+
+
+
+.field input, .field select, .field textarea{
+  width:100%;
+  box-sizing:border-box;
+}
+
+.field input[type="date"]{
+  min-height:44px;
+}
+
+.is-readonly{
+  opacity:0.9;
+}

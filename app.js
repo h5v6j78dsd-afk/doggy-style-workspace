@@ -25,6 +25,105 @@ function daysBetween(from, to){
   return Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
 }
 
+// Feiertage Bayern (vereinfachte, praxisnahe Auswahl; Zeitraum-Berechnung offline)
+function easterSunday(year){
+  // Anonymous Gregorian algorithm (Meeus/Jones/Butcher)
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19*a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2*e + 2*i - h - k) % 7;
+  const m = Math.floor((a + 11*h + 22*l) / 451);
+  const month = Math.floor((h + l - 7*m + 114) / 31); // 3=March, 4=April
+  const day = ((h + l - 7*m + 114) % 31) + 1;
+  return new Date(Date.UTC(year, month-1, day));
+}
+
+function addDaysUTC(d, days){
+  const x = new Date(d.getTime());
+  x.setUTCDate(x.getUTCDate() + days);
+  return x;
+}
+
+function formatYMD(d){
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth()+1).padStart(2,'0');
+  const da = String(d.getUTCDate()).padStart(2,'0');
+  return `${y}-${m}-${da}`;
+}
+
+function bavariaHolidaysSet(year){
+  const set = new Set();
+  const easter = easterSunday(year);
+  // Fixe Feiertage (Bayern)
+  ["01-01","01-06","05-01","10-03","11-01","12-25","12-26"].forEach(md => set.add(`${year}-${md}`));
+  // Mariä Himmelfahrt (15.08.) – regional in Bayern, hier pauschal als „Bayern“ geführt
+  set.add(`${year}-08-15`);
+
+  // Bewegliche Feiertage (über Ostern)
+  set.add(formatYMD(addDaysUTC(easter, -2)));  // Karfreitag
+  set.add(formatYMD(addDaysUTC(easter, 1)));   // Ostermontag
+  set.add(formatYMD(addDaysUTC(easter, 39)));  // Christi Himmelfahrt
+  set.add(formatYMD(addDaysUTC(easter, 50)));  // Pfingstmontag
+  set.add(formatYMD(addDaysUTC(easter, 60)));  // Fronleichnam
+
+  return set;
+}
+
+function countBavariaHolidaysBetween(from, to){
+  // Iteration: [from, to) (to exklusiv) passend zu daysBetween()
+  if(!from || !to) return 0;
+  const start = new Date(from + "T00:00:00Z");
+  const end = new Date(to + "T00:00:00Z");
+  if(!(start < end)) return 0;
+
+  let count = 0;
+  let cur = new Date(start.getTime());
+  while(cur < end){
+    const y = cur.getUTCFullYear();
+    const hol = bavariaHolidaysSet(y);
+    if(hol.has(formatYMD(cur))) count++;
+    cur = addDaysUTC(cur, 1);
+  }
+  return count;
+}
+
+
+function updateAutoHolidayFields(){
+  if(!currentDoc) return;
+  const t = getTemplate(currentDoc.templateId);
+  if(!t || t.id !== "hundeannahme") return;
+
+  const from = currentDoc.meta?.von;
+  const to = currentDoc.meta?.bis;
+  const cnt = (from && to) ? countBavariaHolidaysBetween(from, to) : 0;
+
+  // Anzeige-Felder im Formular (falls vorhanden)
+  const cb = document.querySelector(`#formRoot [data-key="holiday"]`);
+  const num = document.querySelector(`#formRoot [data-key="holiday_days"]`);
+
+  if(cb){
+    cb.checked = cnt > 0;
+    cb.disabled = true;
+  }
+  if(num){
+    num.value = cnt ? String(cnt) : "";
+    num.disabled = true;
+  }
+
+  // in fields spiegeln (für Alt-Kompatibilität / PDF)
+  currentDoc.fields = currentDoc.fields || {};
+  currentDoc.fields.holiday = cnt > 0;
+  currentDoc.fields.holiday_days = cnt || 0;
+}
+
+
 function getPricePerDay(type, days){
   const rules = PRICE_RULES[type] || [];
   for(const r of rules){
@@ -45,28 +144,40 @@ function calculateInvoicePricing(doc){
   const daily = getPricePerDay(meta.betreuung, days);
   const base = days * daily;
 
+  // Feiertags-Zuschlag: nur auf Feiertags-TAGE im Zeitraum, nicht auf den gesamten Aufenthalt
+  const holidayDays = countBavariaHolidaysBetween(meta.von, meta.bis);
+  const holidayValue = Math.round((holidayDays * daily * 0.10) * 100) / 100;
+
   let percentExtra = 0;
   let fixedExtra = 0;
 
-  if(f.holiday) percentExtra += 10;
+  // Prozent-Aufschläge (auf Basisbetrag)
   if(f.special_times) percentExtra += 10;
   if(f.extra_care) percentExtra += 10;
 
-  const percentValue = base * (percentExtra / 100);
+  const percentValue = Math.round((base * (percentExtra / 100)) * 100) / 100;
 
+  // Fixe Extras
   if(f.medication) fixedExtra += days * 2;
   if(f.walk_extra_count) fixedExtra += f.walk_extra_count * 15;
   if(f.bandage_count) fixedExtra += f.bandage_count * 2.5;
   if(f.grooming_count) fixedExtra += f.grooming_count * 5;
 
-  const total = Math.round((base + percentValue + fixedExtra) * 100) / 100;
+  fixedExtra = Math.round(fixedExtra * 100) / 100;
+
+  const total = Math.round((base + holidayValue + percentValue + fixedExtra) * 100) / 100;
 
   doc.pricing = {
     days,
     daily,
     base,
+
+    holidayDays,
+    holidayValue,
+
     percentExtra,
     percentValue,
+
     fixedExtra,
     total
   };
@@ -537,7 +648,7 @@ function autofillHundeannahmeFieldsFromMaster(dogId, { overwrite = false } = {})
   const t = getTemplate(currentDoc.templateId);
   if(!t) return;
 
-  // nur für Templates, die diese Keys haben (Hundeannahme)
+  // Nur für Templates, die diese Keys haben (Hundeannahme)
   const wants = new Set(["halter_name","halter_adresse","halter_telefon","halter_email","halter_notfall","hund_name","hund_rasse","hund_geburt","hund_chip"]);
   const hasAny = Array.isArray(t.sections) && t.sections.some(sec => (sec.fields||[]).some(f => wants.has(f.key)));
   if(!hasAny) return;
@@ -559,15 +670,37 @@ function autofillHundeannahmeFieldsFromMaster(dogId, { overwrite = false } = {})
     hund_chip: pet?.chipNumber || ""
   };
 
+  // Smart-Overwrite:
+  // Wenn vorher schon automatisch befüllt wurde und der Hund gewechselt wird,
+  // überschreiben wir NUR die Felder, die noch exakt den alten Auto-Wert haben.
+  const autoMeta = currentDoc.meta || (currentDoc.meta = {});
+  const prevAutoDogId = autoMeta._autoDogId || "";
+  let prevAutoMap = null;
+  if(!overwrite && prevAutoDogId && prevAutoDogId !== dogId){
+    try { prevAutoMap = JSON.parse(autoMeta._autoSnapshot || "null"); } catch(e){ prevAutoMap = null; }
+  }
+
   let touched = false;
+
   Object.entries(map).forEach(([key, val]) => {
     const inp = document.querySelector(`#formRoot [data-key="${key}"]`);
     if(!inp) return;
+
     if(!overwrite){
-      // nur befüllen, wenn leer
-      const isEmpty = (inp.dataset.ftype==="checkbox") ? (!inp.checked) : (String(inp.value||"").trim()==="");
-      if(!isEmpty) return;
+      // Wenn wir einen Hund-Wechsel haben: nur überschreiben, wenn Feld noch alter Auto-Wert ist
+      if(prevAutoMap && Object.prototype.hasOwnProperty.call(prevAutoMap, key)){
+        const cur = (inp.dataset.ftype==="checkbox") ? String(!!inp.checked) : String(inp.value||"");
+        const old = (inp.dataset.ftype==="checkbox") ? String(!!prevAutoMap[key]) : String(prevAutoMap[key] ?? "");
+        if(cur !== old){
+          return; // Nutzer hat manuell geändert -> nicht überschreiben
+        }
+      } else {
+        // sonst: nur befüllen, wenn leer
+        const isEmpty = (inp.dataset.ftype==="checkbox") ? (!inp.checked) : (String(inp.value||"").trim()==="");
+        if(!isEmpty) return;
+      }
     }
+
     if(inp.dataset.ftype==="checkbox"){
       inp.checked = !!val;
     } else {
@@ -575,6 +708,10 @@ function autofillHundeannahmeFieldsFromMaster(dogId, { overwrite = false } = {})
     }
     touched = true;
   });
+
+  // Auto-Snapshot merken, damit Hundwechsel sauber funktioniert
+  autoMeta._autoDogId = dogId || "";
+  try { autoMeta._autoSnapshot = JSON.stringify(map); } catch(e){}
 
   if(touched) dirty = true;
 }
@@ -1407,6 +1544,7 @@ function renderForm(docObj){
   meta.innerHTML=`<h2>Ort / Datum</h2>`;
   t.meta.forEach(f=>meta.appendChild(renderField(f, docObj.meta[f.key], docObj)));
   root.appendChild(meta);
+  updateAutoHolidayFields();
 const sigCard = document.createElement("div");
 sigCard.className = "card";
 
@@ -1449,10 +1587,19 @@ input.onchange = () => {
     forkDocument();
   }
   dirty = true;
+  // Auto-Feiertage neu berechnen, wenn Zeitraum geändert wird
+  if(f && (f.key==="von" || f.key==="bis")){
+    try { updateAutoHolidayFields(); } catch(e){}
+  }
 };
 if (currentDoc.saved) {
   input.disabled = true;
 }
+  // readonly/auto fields (z.B. Feiertage)
+  if(f.readonly){
+    input.disabled = true;
+    input.classList.add("is-readonly");
+  }
   
 wrap.appendChild(input);
   return wrap;
