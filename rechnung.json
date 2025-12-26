@@ -1,0 +1,42 @@
+{
+  "type": "rechnung",
+  "title": "Rechnung",
+  "version": "1.0-cent-stable",
+
+  "meta": {
+    "currency": "EUR",
+    "vatRatePercent": 19,
+    "amountUnit": "cent"
+  },
+
+  "kopf": {
+    "rechnungsnummer": "",
+    "rechnungsdatum": "",
+    "leistungsdatum": ""
+  },
+
+  "kunde": {
+    "kundenId": "",
+    "name": "",
+    "adresse": "",
+    "email": ""
+  },
+
+  "positionen": [
+    {
+      "beschreibung": "",
+      "menge": 1,
+      "einzelpreisCent": 0
+    }
+  ],
+
+  "summen": {
+    "nettoCent": 0,
+    "mwstCent": 0,
+    "bruttoCent": 0
+  },
+
+  "hinweis": "",
+  "zahlungsziel": "",
+  "status": "entwurf"
+}
