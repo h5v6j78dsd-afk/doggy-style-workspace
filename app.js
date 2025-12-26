@@ -1383,6 +1383,7 @@ normalizeMeta(currentDoc);
   $("#dogSelect").value=currentDoc.dogId||state.dogs?.[0]?.id||"";
   renderCustomerInfoForDogId($("#dogSelect").value);
   renderEditor(currentDoc);
+  autofillHundeannahmeFieldsFromMaster($("#dogSelect").value, { overwrite:false });
 renderVersions(currentDoc);
   
   $("#dsGvoText").textContent=getTemplate(currentDoc.templateId)?.dsGvoNote||"";
@@ -1472,6 +1473,7 @@ $("#dogSelect").addEventListener("change", () => {
   currentDoc.dogId = $("#dogSelect").value;
   ensureDocLinks(currentDoc);
   renderCustomerInfoForDogId(currentDoc.dogId);
+  autofillHundeannahmeFieldsFromMaster(currentDoc.dogId, { overwrite:false });
   dirty = true;
 });
 
