@@ -112,20 +112,46 @@
       "fields": [
         {
           "key": "holiday",
-          "label": "Feiertag / Feiertagsbetreuung (+10%)",
+          "label": "Feiertage im Zeitraum (automatisch, +10% nur auf Feiertage)",
           "type": "checkbox",
-          "required": false
+          "required": false,
+          "readonly": true
+        },
+        {
+          "key": "holiday_days",
+          "label": "Feiertage im Zeitraum (Anzahl)",
+          "type": "number",
+          "required": false,
+          "readonly": true
         },
         {
           "key": "special_times",
-          "label": "Sonderzeiten / Sonderaufwand (+10%)",
+          "label": "Sonderzeiten / Sonderaufwand (+10% auf Grundpreis)",
           "type": "checkbox",
           "required": false
         },
         {
           "key": "extra_care",
-          "label": "Besondere Betreuung (+10%)",
+          "label": "Besondere Betreuung (+10% auf Grundpreis)",
           "type": "checkbox",
+          "required": false
+        },
+        {
+          "key": "medication",
+          "label": "Medikamentengabe (2€ pro Tag)",
+          "type": "checkbox",
+          "required": false
+        },
+        {
+          "key": "walk_extra_count",
+          "label": "Extra Spaziergang (Anzahl × 15€)",
+          "type": "number",
+          "required": false
+        },
+        {
+          "key": "bandage_count",
+          "label": "Verbandwechsel (Anzahl × 2,50€)",
+          "type": "number",
           "required": false
         },
         {
