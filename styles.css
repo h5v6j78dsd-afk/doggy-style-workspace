@@ -37,3 +37,10 @@ textarea{min-height:88px;resize:vertical}
 /* Etappe 2: Kunden/Hunde Editor Layout */
 .grid2{display:grid;grid-template-columns:1fr;gap:12px}
 @media (min-width:900px){.grid2{grid-template-columns:1fr 1fr}}
+
+
+.req{color:#d00;font-weight:700;margin-left:4px;}
+.opt{margin-top:10px;}
+.opt > summary{cursor:pointer;color:#333;font-weight:600;}
+.field input:disabled,.field textarea:disabled,.field select:disabled{opacity:0.85;}
+.readonlyField input,.readonlyField textarea{background:#f4f4f4;}

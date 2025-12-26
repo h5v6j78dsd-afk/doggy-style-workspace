@@ -86,24 +86,87 @@
 <div class="card">
 <h3>Kunde (Halter)</h3>
 <div class="row" style="flex-wrap:wrap; gap:12px;">
-<label class="field"><span>Name</span><input id="c_name" placeholder="Max Müller" type="text"/></label>
-<label class="field"><span>Telefon</span><input id="c_phone" placeholder="+49 ..." type="tel"/></label>
-<label class="field"><span>E‑Mail</span><input id="c_email" placeholder="mail@..." type="email"/></label>
-<label class="field"><span>Straße/Hausnr.</span><input id="c_street" type="text"/></label>
-<label class="field"><span>PLZ</span><input id="c_zip" type="text"/></label>
-<label class="field"><span>Ort</span><input id="c_city" type="text"/></label>
-<label class="field" style="min-width:100%;"><span>Notiz</span><textarea id="c_note" rows="2"></textarea></label>
+<h3>Kunde (Halter)</h3>
+<div class="row" style="flex-wrap:wrap; gap:12px;">
+  <label class="field"><span>Name <span class="req">*</span></span><input id="c_name" placeholder="Max Müller" type="text"/></label>
+  <label class="field"><span>Telefon <span class="req">*</span></span><input id="c_phone" placeholder="+49 ..." type="tel"/></label>
+</div>
+
+<details class="opt">
+  <summary>Adresse & Kontakt (optional)</summary>
+  <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
+    <label class="field"><span>E‑Mail</span><input id="c_email" placeholder="mail@..." type="email"/></label>
+    <label class="field"><span>Straße/Hausnr.</span><input id="c_street" type="text"/></label>
+    <label class="field"><span>PLZ</span><input id="c_zip" type="text"/></label>
+    <label class="field"><span>Ort</span><input id="c_city" type="text"/></label>
+  </div>
+</details>
+
+<details class="opt">
+  <summary>Notfall & Abholung (optional)</summary>
+  <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
+    <label class="field"><span>Notfallkontakt – Name</span><input id="c_em_name" type="text"/></label>
+    <label class="field"><span>Notfallkontakt – Telefon</span><input id="c_em_phone" type="tel"/></label>
+    <label class="field" style="min-width:100%;"><span>Abholberechtigt (Freitext)</span><input id="c_pickup_auth" type="text" placeholder="z.B. Oma, Nachbar, ..."/></label>
+  </div>
+</details>
+
+<details class="opt" open>
+  <summary>Notizen (optional)</summary>
+  <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
+    <label class="field" style="min-width:100%;"><span>Interne Notiz</span><textarea id="c_note" rows="2"></textarea></label>
+  </div>
+</details>
+
 </div>
 </div>
 <div class="card">
 <h3>Hund</h3>
 <div class="row" style="flex-wrap:wrap; gap:12px;">
-<label class="field"><span>Name</span><input id="p_name" placeholder="Bello" type="text"/></label>
-<label class="field"><span>Rasse</span><input id="p_breed" type="text"/></label>
-<label class="field"><span>Geburtsdatum</span><input id="p_birthdate" type="date"/></label>
-<label class="field"><span>Chip vorhanden</span><input id="p_chip" style="width:22px;height:22px;" type="checkbox"/></label>
-<label class="field"><span>Chipnummer</span><input id="p_chipNumber" type="text"/></label>
-<label class="field" style="min-width:100%;"><span>Notiz</span><textarea id="p_note" rows="2"></textarea></label>
+<h3>Hund</h3>
+<div class="row" style="flex-wrap:wrap; gap:12px;">
+  <label class="field"><span>Name <span class="req">*</span></span><input id="p_name" placeholder="Bello" type="text"/></label>
+  <label class="field"><span>Rasse / Mix</span><input id="p_breed" type="text"/></label>
+  <label class="field"><span>Geburtsdatum</span><input id="p_birthdate" type="date"/></label>
+</div>
+
+<div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
+  <label class="field"><span>Gechippt? <span class="req">*</span></span>
+    <select id="p_chipStatus">
+      <option value="">— bitte wählen —</option>
+      <option value="yes">Ja</option>
+      <option value="no">Nein</option>
+    </select>
+  </label>
+  <label class="field"><span>Chipnummer (wenn Ja)</span><input id="p_chipNumber" type="text"/></label>
+</div>
+
+<details class="opt">
+  <summary>Gesundheit (optional)</summary>
+  <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
+    <label class="field"><span>Tierarzt (Name/Ort)</span><input id="p_vet" type="text"/></label>
+    <label class="field"><span>Tierarzt Telefon</span><input id="p_vetPhone" type="tel"/></label>
+    <label class="field" style="min-width:100%;"><span>Allergien / Unverträglichkeiten</span><textarea id="p_allergies" rows="2"></textarea></label>
+    <label class="field" style="min-width:100%;"><span>Dauermedikation (Name + Dosierung)</span><textarea id="p_meds" rows="2"></textarea></label>
+  </div>
+</details>
+
+<details class="opt">
+  <summary>Alltag & Verhalten (optional)</summary>
+  <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
+    <label class="field"><span>Standard-Futter</span><input id="p_food" type="text"/></label>
+    <label class="field"><span>Fütterung (Menge/Zeiten)</span><input id="p_feeding" type="text"/></label>
+    <label class="field"><span>Verträglichkeit</span><input id="p_compat" type="text" placeholder="z.B. freundlich / nur Hündinnen / ..."/></label>
+    <label class="field" style="min-width:100%;"><span>Ängste/Trigger/Besonderheiten</span><textarea id="p_behavior" rows="2"></textarea></label>
+  </div>
+</details>
+
+<details class="opt" open>
+  <summary>Notizen (optional)</summary>
+  <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
+    <label class="field" style="min-width:100%;"><span>Interne Notiz</span><textarea id="p_note" rows="2"></textarea></label>
+  </div>
+</details>
 </div>
 </div>
 </div>

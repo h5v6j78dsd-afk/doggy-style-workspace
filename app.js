@@ -344,7 +344,7 @@ function getPet(id){
 }
 
 function setCustomerFieldsDisabled(disabled){
-  ["c_name","c_phone","c_email","c_street","c_zip","c_city","c_note"].forEach(id=>{
+  ["c_name","c_phone","c_email","c_street","c_zip","c_city","c_em_name","c_em_phone","c_pickup_auth","c_note"].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.disabled=!!disabled;
   });
@@ -358,11 +358,11 @@ function refreshCustomerSelect(){
 }
 
 function clearCpEditor(){
-  ["c_name","c_phone","c_email","c_street","c_zip","c_city","c_note","p_name","p_breed","p_chipNumber","p_note"].forEach(id=>{
+  ["c_name","c_phone","c_email","c_street","c_zip","c_city","c_em_name","c_em_phone","c_pickup_auth","c_note","p_name","p_breed","p_chipNumber","p_vet","p_vetPhone","p_food","p_feeding","p_compat","p_note","p_allergies","p_meds","p_behavior"].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value="";
   });
   const bd=document.getElementById("p_birthdate"); if(bd) bd.value="";
-  const chip=document.getElementById("p_chip"); if(chip) chip.checked=false;
+  const cs=document.getElementById("p_chipStatus"); if(cs) cs.value="";
   const use=document.getElementById("useExistingCustomer"); if(use) use.checked=false;
   const hint=document.getElementById("cpHint"); if(hint) hint.textContent="";
   setCustomerFieldsDisabled(false);
@@ -377,13 +377,25 @@ function fillCpEditorForPet(pet){
     $("#c_street").value = c.street||"";
     $("#c_zip").value = c.zip||"";
     $("#c_city").value = c.city||"";
+    $("#c_em_name").value = c.emergencyName||"";
+    $("#c_em_phone").value = c.emergencyPhone||"";
+    $("#c_pickup_auth").value = c.pickupAuth||"";
     $("#c_note").value = c.note||"";
   }
   $("#p_name").value = pet.name||"";
   $("#p_breed").value = pet.breed||"";
   $("#p_birthdate").value = pet.birthdate||"";
-  $("#p_chip").checked = !!pet.chip;
+  const cs=document.getElementById("p_chipStatus");
+  if(cs) cs.value = pet.chip ? "yes" : "no";
   $("#p_chipNumber").value = pet.chipNumber||"";
+  $("#p_vet").value = pet.vet||"";
+  $("#p_vetPhone").value = pet.vetPhone||"";
+  $("#p_allergies").value = pet.allergies||"";
+  $("#p_meds").value = pet.meds||"";
+  $("#p_food").value = pet.food||"";
+  $("#p_feeding").value = pet.feeding||"";
+  $("#p_compat").value = pet.compat||"";
+  $("#p_behavior").value = pet.behavior||"";
   $("#p_note").value = pet.note||"";
 }
 
@@ -517,6 +529,54 @@ function renderCustomerInfoForDogId(dogId){
     parts.push(`${pet.name||"Hund"}${breed} · ${chip}`);
   }
   box.textContent = parts.filter(Boolean).join(" | ");
+}
+
+
+function autofillHundeannahmeFieldsFromMaster(dogId, { overwrite = false } = {}){
+  if(!currentDoc) return;
+  const t = getTemplate(currentDoc.templateId);
+  if(!t) return;
+
+  // nur für Templates, die diese Keys haben (Hundeannahme)
+  const wants = new Set(["halter_name","halter_adresse","halter_telefon","halter_email","halter_notfall","hund_name","hund_rasse","hund_geburt","hund_chip"]);
+  const hasAny = Array.isArray(t.sections) && t.sections.some(sec => (sec.fields||[]).some(f => wants.has(f.key)));
+  if(!hasAny) return;
+
+  const pet = getPetByDogId(dogId);
+  const cust = getCustomerByDogId(dogId);
+
+  // Mapping: Stamm -> Formular
+  const addr = cust ? [cust.street||"", [cust.zip, cust.city].filter(Boolean).join(" ")].filter(Boolean).join("\n") : "";
+  const map = {
+    halter_name: cust?.name || "",
+    halter_adresse: addr,
+    halter_telefon: cust?.phone || "",
+    halter_email: cust?.email || "",
+    halter_notfall: (cust ? [cust.emergencyName, cust.emergencyPhone].filter(Boolean).join(" · ") : "") || (pet?.emergencyContact || ""),
+    hund_name: pet?.name || "",
+    hund_rasse: pet?.breed || "",
+    hund_geburt: pet?.birthdate || "",
+    hund_chip: pet?.chipNumber || ""
+  };
+
+  let touched = false;
+  Object.entries(map).forEach(([key, val]) => {
+    const inp = document.querySelector(`#formRoot [data-key="${key}"]`);
+    if(!inp) return;
+    if(!overwrite){
+      // nur befüllen, wenn leer
+      const isEmpty = (inp.dataset.ftype==="checkbox") ? (!inp.checked) : (String(inp.value||"").trim()==="");
+      if(!isEmpty) return;
+    }
+    if(inp.dataset.ftype==="checkbox"){
+      inp.checked = !!val;
+    } else {
+      inp.value = val;
+    }
+    touched = true;
+  });
+
+  if(touched) dirty = true;
 }
 
 
@@ -1106,6 +1166,8 @@ $("#btnCpSave").addEventListener("click",()=>{
   } else {
     const name = $("#c_name").value.trim();
     if(!name){ alert("Bitte Kundennamen eintragen."); return; }
+    const phone = $("#c_phone").value.trim();
+    if(!phone){ alert("Bitte eine Telefonnummer eintragen."); return; }
     customer = {
       id: uid(),
       name,
@@ -1114,6 +1176,9 @@ $("#btnCpSave").addEventListener("click",()=>{
       street: $("#c_street").value.trim(),
       zip: $("#c_zip").value.trim(),
       city: $("#c_city").value.trim(),
+      emergencyName: $("#c_em_name").value.trim(),
+      emergencyPhone: $("#c_em_phone").value.trim(),
+      pickupAuth: $("#c_pickup_auth").value.trim(),
       note: $("#c_note").value.trim(),
       createdAt: Date.now(),
       updatedAt: Date.now()
@@ -1124,6 +1189,11 @@ $("#btnCpSave").addEventListener("click",()=>{
 
   const petName = $("#p_name").value.trim();
   if(!petName){ alert("Bitte Hundename eintragen."); return; }
+  const csNew = $("#p_chipStatus").value;
+  if(!csNew){ alert("Bitte bei „Gechippt?“ Ja oder Nein wählen."); return; }
+  const chipNew = (csNew==="yes");
+  const chipNrNew = $("#p_chipNumber").value.trim();
+  if(chipNew && !chipNrNew){ alert("Bitte die Chipnummer eintragen."); return; }
 
   if(mode==="edit" && cpEdit.petId){
     const pet = getPet(cpEdit.petId);
@@ -1133,10 +1203,14 @@ $("#btnCpSave").addEventListener("click",()=>{
     if(customer && customer.id){
       customer.name = $("#c_name").value.trim() || customer.name;
       customer.phone = $("#c_phone").value.trim();
+      if(!customer.phone){ alert("Bitte eine Telefonnummer eintragen."); return; }
       customer.email = $("#c_email").value.trim();
       customer.street = $("#c_street").value.trim();
       customer.zip = $("#c_zip").value.trim();
       customer.city = $("#c_city").value.trim();
+      customer.emergencyName = $("#c_em_name").value.trim();
+      customer.emergencyPhone = $("#c_em_phone").value.trim();
+      customer.pickupAuth = $("#c_pickup_auth").value.trim();
       customer.note = $("#c_note").value.trim();
       customer.updatedAt = Date.now();
     }
@@ -1145,8 +1219,19 @@ $("#btnCpSave").addEventListener("click",()=>{
     pet.name = petName;
     pet.breed = $("#p_breed").value.trim();
     pet.birthdate = $("#p_birthdate").value;
-    pet.chip = $("#p_chip").checked;
+    const cs = $("#p_chipStatus").value;
+    if(!cs){ alert("Bitte bei „Gechippt?“ Ja oder Nein wählen."); return; }
+    pet.chip = (cs==="yes");
     pet.chipNumber = $("#p_chipNumber").value.trim();
+    if(pet.chip && !pet.chipNumber){ alert("Bitte die Chipnummer eintragen."); return; }
+    pet.vet = $("#p_vet").value.trim();
+    pet.vetPhone = $("#p_vetPhone").value.trim();
+    pet.allergies = $("#p_allergies").value.trim();
+    pet.meds = $("#p_meds").value.trim();
+    pet.food = $("#p_food").value.trim();
+    pet.feeding = $("#p_feeding").value.trim();
+    pet.compat = $("#p_compat").value.trim();
+    pet.behavior = $("#p_behavior").value.trim();
     pet.note = $("#p_note").value.trim();
     pet.updatedAt = Date.now();
 
@@ -1164,8 +1249,16 @@ $("#btnCpSave").addEventListener("click",()=>{
     name: petName,
     breed: $("#p_breed").value.trim(),
     birthdate: $("#p_birthdate").value,
-    chip: $("#p_chip").checked,
-    chipNumber: $("#p_chipNumber").value.trim(),
+    chip: chipNew,
+    chipNumber: chipNrNew,
+    vet: $("#p_vet").value.trim(),
+    vetPhone: $("#p_vetPhone").value.trim(),
+    allergies: $("#p_allergies").value.trim(),
+    meds: $("#p_meds").value.trim(),
+    food: $("#p_food").value.trim(),
+    feeding: $("#p_feeding").value.trim(),
+    compat: $("#p_compat").value.trim(),
+    behavior: $("#p_behavior").value.trim(),
     note: $("#p_note").value.trim(),
     createdAt: Date.now(),
     updatedAt: Date.now()
@@ -1305,13 +1398,13 @@ function renderForm(docObj){
     const card=document.createElement("div");
     card.className="card";
     card.innerHTML=`<h2>${escapeHtml(sec.title)}</h2>`;
-    sec.fields.forEach(f=>card.appendChild(renderField(f, docObj.fields[f.key])));
+    sec.fields.forEach(f=>card.appendChild(renderField(f, docObj.fields[f.key], docObj)));
     root.appendChild(card);
   });
   const meta=document.createElement("div");
   meta.className="card";
   meta.innerHTML=`<h2>Ort / Datum</h2>`;
-  t.meta.forEach(f=>meta.appendChild(renderField(f, docObj.meta[f.key])));
+  t.meta.forEach(f=>meta.appendChild(renderField(f, docObj.meta[f.key], docObj)));
   root.appendChild(meta);
 const sigCard = document.createElement("div");
 sigCard.className = "card";
@@ -1333,7 +1426,7 @@ sigCard.innerHTML = `
 
 root.appendChild(sigCard);
 }
-function renderField(f,value){
+function renderField(f,value,docObj){
   const wrap=document.createElement("label");
   wrap.className="field"; wrap.style.minWidth="260px";
   wrap.innerHTML=`<span>${escapeHtml(f.label)}${f.required?" *":""}</span>`;
