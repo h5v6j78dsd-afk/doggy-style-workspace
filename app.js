@@ -1123,10 +1123,10 @@ function renderEditor(doc){
   }
 
   // 📄 Rechnung Editor (falls genutzt)
-  if(template.id === "rechnung"){
-    renderInvoiceEditor(doc, template);
-    return;
-  }
+if(template.id === "rechnung"){
+  renderInvoiceEditorB2(doc);
+  return;
+}
 
   // 🐶 Standard-Dokumente (z. B. Hundeannahme)
   renderForm(doc);
