@@ -1,11 +1,11 @@
 {
   "id": "rechnung",
   "title": "Rechnung",
-  "type": "rechnung",
+  "type": "invoice",
   "version": "1.0",
   "taxRate": 0.19,
 
-  "sections": "rechnung"[
+  "sections": [
     {
       "id": "kunde",
       "title": "Kunde",
