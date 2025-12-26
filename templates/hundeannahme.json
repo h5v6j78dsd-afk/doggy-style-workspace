@@ -1,152 +1,23 @@
 {
   "id": "hundeannahme",
-  "name": "Hundeannahme",
-  "version": "1.0",
+  "title": "Hundeannahme",
+  "type": "form",
   "sections": [
     {
-      "title": "Angaben Hundehalter",
+      "id": "basis",
+      "title": "Grunddaten",
       "fields": [
         {
-          "key": "halter_name",
-          "label": "Name",
-          "type": "text",
-          "required": true
+          "id": "halter_name",
+          "label": "Name Halter",
+          "type": "text"
         },
         {
-          "key": "halter_adresse",
-          "label": "Adresse",
-          "type": "textarea",
-          "required": true
-        },
-        {
-          "key": "halter_telefon",
-          "label": "Telefon",
-          "type": "tel",
-          "required": true
-        },
-        {
-          "key": "halter_email",
-          "label": "E‑Mail",
-          "type": "email",
-          "required": false
-        },
-        {
-          "key": "halter_notfall",
-          "label": "Notfallkontakt (Name & Tel.)",
-          "type": "text",
-          "required": true
-        }
-      ]
-    },
-    {
-      "title": "Angaben Hund",
-      "fields": [
-        {
-          "key": "hund_name",
+          "id": "hund_name",
           "label": "Name Hund",
-          "type": "text",
-          "required": true
-        },
-        {
-          "key": "hund_rasse",
-          "label": "Rasse / Mix",
-          "type": "text",
-          "required": false
-        },
-        {
-          "key": "hund_geburt",
-          "label": "Geburtsdatum / Alter",
-          "type": "text",
-          "required": false
-        },
-        {
-          "key": "hund_chip",
-          "label": "Chipnummer",
-          "type": "text",
-          "required": false
-        }
-      ]
-    },
-    {
-      "title": "Betreuung",
-      "fields": [
-        {
-          "key": "bring",
-          "label": "Bringdatum / Uhrzeit",
-          "type": "datetime-local",
-          "required": true
-        },
-        {
-          "key": "abhol",
-          "label": "Abholdatum / Uhrzeit",
-          "type": "datetime-local",
-          "required": true
-        }
-      ]
-    },
-    {
-      "title": "Einverständnisse",
-      "fields": [
-        {
-          "key": "ev_wahr",
-          "label": "Ich versichere, dass alle Angaben wahrheitsgemäß sind.",
-          "type": "checkbox",
-          "required": true
-        },
-        {
-          "key": "ev_hv",
-          "label": "Ich bestätige, dass mein Hund haftpflichtversichert ist.",
-          "type": "checkbox",
-          "required": true
-        },
-        {
-          "key": "ev_gesund",
-          "label": "Ich bestätige, dass mein Hund frei von ansteckenden Krankheiten ist.",
-          "type": "checkbox",
-          "required": true
-        },
-        {
-          "key": "ev_tierarzt",
-          "label": "Ich erlaube im Notfall eine tierärztliche Versorgung. Die Kosten trage ich als Halter.",
-          "type": "checkbox",
-          "required": true
+          "type": "text"
         }
       ]
     }
-  ],
-  "signature": {
-    "key": "sig_halter",
-    "label": "Unterschrift Hundehalter (Apple Pencil/Finger)"
-  },
-"meta": [
-  {
-    "key": "betreuung",
-    "label": "Art der Betreuung",
-    "type": "select",
-    "required": true,
-    "options": [
-      "Urlaubsbetreuung",
-      "Tagesbetreuung"
-    ]
-  },
-  {
-    "key": "von",
-    "label": "Betreuung von",
-    "type": "date",
-    "required": true
-  },
-  {
-    "key": "bis",
-    "label": "Betreuung bis",
-    "type": "date",
-    "required": true
-  },
-  {
-    "key": "ort_datum",
-    "label": "Ort / Datum",
-    "type": "text",
-    "required": true
-  }
-],
-  "dsGvoNote": "Datenschutz: Die angegebenen personenbezogenen Daten werden ausschließlich zur Betreuung des Hundes und zur Erfüllung gesetzlicher Pflichten verarbeitet. Weitergabe nur an Tierärzte im Notfall. Löschung nach gesetzlichen Aufbewahrungsfristen."
+  ]
 }
