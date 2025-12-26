@@ -1,210 +1,130 @@
-/* =========================================================
-   DOGGY STYLE WORKSPACE – PHASE C (STABIL)
-   Ziel: App darf NIE einfrieren
-   ========================================================= */
-
 "use strict";
 
-/* ===================== BASIS ===================== */
-
-const LS_KEY = "doggy_style_workspace_state_v1";
+/* =========================================================
+   DOGGY STYLE – PHASE C CLEAN (STABIL)
+   ========================================================= */
 
 const state = {
   templates: [],
-  docs: [],
-  dogs: [],
-  customers: []
+  currentDoc: null
 };
 
-/* ===================== HILFSFUNKTIONEN ===================== */
+/* ===================== UTILS ===================== */
 
-function $(sel) {
-  return document.querySelector(sel);
+function $(id) {
+  return document.getElementById(id);
 }
 
-function $all(sel) {
-  return document.querySelectorAll(sel);
+function log(msg, data) {
+  console.log("[APP]", msg, data || "");
 }
 
-function safe(fn, fallback = null) {
-  try {
-    return fn();
-  } catch (e) {
-    console.warn("Safe-Fallback:", e);
-    return fallback;
-  }
-}
+/* ===================== TEMPLATE LOADER ===================== */
 
-/* ===================== STORAGE ===================== */
-
-function loadState() {
-  const raw = localStorage.getItem(LS_KEY);
-  if (!raw) return;
-  try {
-    const parsed = JSON.parse(raw);
-    Object.assign(state, parsed);
-  } catch (e) {
-    console.warn("State konnte nicht geladen werden:", e);
-  }
-}
-
-function saveState() {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(state));
-  } catch (e) {
-    console.warn("State konnte nicht gespeichert werden:", e);
-  }
-}
-
-/* ===================== TEMPLATE LOADER (SICHER) ===================== */
-
-async function loadTemplateSafe(path) {
-  try {
-    const res = await fetch(path, { cache: "no-store" });
-    if (!res.ok) throw new Error(res.status);
-    const json = await res.json();
-    if (!json || !json.type) throw new Error("Ungültiges Template");
-    return json;
-  } catch (e) {
-    console.warn("Template übersprungen:", path, e.message);
-    return null;
-  }
-}
+const TEMPLATE_INDEX = [
+  { id: "hundeannahme", path: "templates/hundeannahme.json" },
+  { id: "rechnung", path: "templates/rechnung.json" }
+];
 
 async function loadTemplates() {
   state.templates = [];
 
-  const BASE_PATH = window.location.pathname.replace(/\/[^/]*$/, "/");
+  for (const entry of TEMPLATE_INDEX) {
+    try {
+      const res = await fetch(entry.path, { cache: "no-store" });
+      if (!res.ok) throw new Error(res.status);
+      const json = await res.json();
 
-const files = [
-  BASE_PATH + "hundeannahme.json",
-  BASE_PATH + "rechnung.json"
-];
-  for (const f of files) {
-    const tpl = await loadTemplateSafe(f);
-    if (tpl) state.templates.push(tpl);
-  }
+      if (!json.id || !json.type || !json.sections) {
+        throw new Error("Ungültige Template-Struktur");
+      }
 
-  /* Fallback: Hundeannahme immer verfügbar */
-  if (!state.templates.find(t => t.type === "hundeannahme")) {
-    state.templates.push({
-      type: "hundeannahme",
-      title: "Hundeannahme (Fallback)",
-      fields: []
-    });
+      state.templates.push(json);
+      log("Template geladen:", json.id);
+    } catch (e) {
+      console.warn("Template ignoriert:", entry.path, e.message);
+    }
   }
 }
 
-/* ===================== NAVIGATION ===================== */
+/* ===================== UI ===================== */
 
 function initNavigation() {
-  $all("[data-panel]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const target = btn.getAttribute("data-panel");
-      showPanel(target);
-    });
+  document.querySelectorAll("[data-panel]").forEach(btn => {
+    btn.onclick = () => showPanel(btn.dataset.panel);
   });
 }
 
 function showPanel(id) {
-  $all(".panel").forEach(p => p.classList.remove("is-active"));
-  const el = document.getElementById(id);
-  if (el) el.classList.add("is-active");
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+  const el = $(id);
+  if (el) el.classList.add("active");
 }
-
-/* ===================== HOME ===================== */
-
-function renderHome() {
-  safe(() => {
-    $("#occupancy").innerHTML = `
-      <div>Urlaubsbetreuung: 0 / 10 Hunde</div>
-      <div>Tagesbetreuung: 0 / 12 Hunde</div>
-    `;
-  });
-
-  safe(() => {
-    $("#todayStatus").textContent = "Noch keine Hunde eingecheckt.";
-  });
-
-  renderTemplateSelect();
-  renderRecentDocs();
-}
-
-/* ===================== TEMPLATE SELECT ===================== */
 
 function renderTemplateSelect() {
-  const sel = $("#templateSelect");
-  if (!sel) return;
-
+  const sel = $("templateSelect");
   sel.innerHTML = "";
 
   state.templates.forEach(t => {
     const opt = document.createElement("option");
-    opt.value = t.type;
-    opt.textContent = t.title || t.type;
+    opt.value = t.id;
+    opt.textContent = t.title;
     sel.appendChild(opt);
   });
-
-  if (!state.templates.length) {
-    const opt = document.createElement("option");
-    opt.textContent = "Keine Optionen";
-    sel.appendChild(opt);
-  }
 }
 
-/* ===================== DOKUMENTE ===================== */
+/* ===================== EDITOR ===================== */
 
-function renderRecentDocs() {
-  const box = $("#recentDocs");
-  if (!box) return;
+function openEditor(templateId) {
+  const tpl = state.templates.find(t => t.id === templateId);
+  if (!tpl) return alert("Vorlage nicht gefunden");
 
-  if (!state.docs.length) {
-    box.innerHTML = "<em>Noch keine Dokumente.</em>";
-    return;
-  }
+  state.currentDoc = JSON.parse(JSON.stringify(tpl));
+  renderEditor();
+}
 
+function renderEditor() {
+  const box = $("editor");
   box.innerHTML = "";
-  state.docs.slice(-5).reverse().forEach(d => {
-    const div = document.createElement("div");
-    div.className = "doc-row";
-    div.innerHTML = `
-      <strong>${d.type}</strong>
-      <button>Öffnen</button>
-    `;
-    box.appendChild(div);
+
+  state.currentDoc.sections.forEach(section => {
+    const h = document.createElement("h3");
+    h.textContent = section.title;
+    box.appendChild(h);
+
+    section.fields.forEach(field => {
+      const label = document.createElement("label");
+      label.textContent = field.label;
+
+      const input = document.createElement("input");
+      input.type = "text";
+
+      box.appendChild(label);
+      box.appendChild(input);
+    });
   });
+
+  showPanel("editorPanel");
 }
 
-/* ===================== NEUES DOKUMENT ===================== */
+/* ===================== EVENTS ===================== */
 
 function initCreateDoc() {
-  const btn = $("#createDocBtn");
-  if (!btn) return;
-
-  btn.addEventListener("click", () => {
-    const sel = $("#templateSelect");
-    if (!sel || !sel.value) return alert("Keine Vorlage gewählt");
-
-    const type = sel.value;
-    openEditor(type);
-  });
-}
-
-function openEditor(type) {
-  alert(`Editor geöffnet: ${type}\n(Phase C – Editor bewusst minimal)`);
+  $("createDocBtn").onclick = () => {
+    const val = $("templateSelect").value;
+    if (!val) return;
+    openEditor(val);
+  };
 }
 
 /* ===================== BOOT ===================== */
 
 async function boot() {
-  loadState();
   await loadTemplates();
   initNavigation();
   initCreateDoc();
-  renderHome();
+  renderTemplateSelect();
   showPanel("home");
 }
-
-/* ===================== START ===================== */
 
 document.addEventListener("DOMContentLoaded", boot);
