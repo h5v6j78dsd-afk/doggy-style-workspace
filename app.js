@@ -74,11 +74,12 @@ async function loadTemplateSafe(path) {
 async function loadTemplates() {
   state.templates = [];
 
-  const files = [
-    "hundeannahme.json",
-    "rechnung.json"
-  ];
+  const BASE_PATH = window.location.pathname.replace(/\/[^/]*$/, "/");
 
+const files = [
+  BASE_PATH + "hundeannahme.json",
+  BASE_PATH + "rechnung.json"
+];
   for (const f of files) {
     const tpl = await loadTemplateSafe(f);
     if (tpl) state.templates.push(tpl);
