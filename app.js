@@ -172,6 +172,355 @@ const getTemplate=id=>templates.find(t=>t.id===id);
 
 
 function uid(){return Math.random().toString(16).slice(2)+Date.now().toString(16);}
+
+// ===== ETAPPE 1: Datenmodell v2 + Migration (Kunden/Hunde/Aufenthalte/Rechnungen) =====
+function ensureStateShape(){
+  // Basis-Defaults (ohne UID-Erzeugung, damit es beim ersten Load robust bleibt)
+  if(!state || typeof state !== "object") return;
+  if(typeof state.schemaVersion !== "number") state.schemaVersion = 1;
+
+  state.dogs = Array.isArray(state.dogs) ? state.dogs : [];
+  state.docs = Array.isArray(state.docs) ? state.docs : [];
+
+  state.customers = Array.isArray(state.customers) ? state.customers : [];
+  state.pets = Array.isArray(state.pets) ? state.pets : [];
+  state.stays = Array.isArray(state.stays) ? state.stays : [];
+  state.invoices = Array.isArray(state.invoices) ? state.invoices : [];
+
+  state._legacy = (state._legacy && typeof state._legacy === "object") ? state._legacy : {};
+  state._legacy.dogIdToCustomerId = (state._legacy.dogIdToCustomerId && typeof state._legacy.dogIdToCustomerId === "object") ? state._legacy.dogIdToCustomerId : {};
+  state._legacy.dogIdToPetId = (state._legacy.dogIdToPetId && typeof state._legacy.dogIdToPetId === "object") ? state._legacy.dogIdToPetId : {};
+  state._legacy.docIdToStayId = (state._legacy.docIdToStayId && typeof state._legacy.docIdToStayId === "object") ? state._legacy.docIdToStayId : {};
+  state._legacy.docIdToInvoiceId = (state._legacy.docIdToInvoiceId && typeof state._legacy.docIdToInvoiceId === "object") ? state._legacy.docIdToInvoiceId : {};
+
+  // Rechnungsnummer beibehalten
+  if(typeof state.nextInvoiceNumber !== "number"){
+    state.nextInvoiceNumber = 1;
+  }
+}
+
+function migrateToV2(){
+  // Migration ist bewusst "additiv": wir verlieren NICHTS aus state.dogs/state.docs,
+  // sondern spiegeln alles zusätzlich sauber in customers/pets/stays/invoices.
+  if(state.schemaVersion >= 2) return;
+
+  ensureStateShape();
+
+  const dogIdToCustomerId = {};
+  const dogIdToPetId = {};
+  const docIdToStayId = {};
+  const docIdToInvoiceId = {};
+
+  // --- 1) dogs[] -> customers[] + pets[] ---
+  const customerIndex = new Map(); // key -> customerId
+  const customers = [];
+  const pets = [];
+
+  (state.dogs||[]).forEach(d=>{
+    if(!d || d.isPlaceholder) return;
+
+    const owner = String(d.owner||"").trim();
+    const phone = String(d.phone||"").trim();
+    const dogName = String(d.name||"").trim();
+
+    // Key: (owner + phone) – falls owner fehlt, trotzdem stabil
+    const key = (owner.toLowerCase()+"|"+phone.toLowerCase()).trim();
+
+    let customerId = customerIndex.get(key);
+    if(!customerId){
+      customerId = "c_"+uid();
+      customerIndex.set(key, customerId);
+      customers.push({
+        id: customerId,
+        name: owner || "(ohne Name)",
+        street: "",
+        zip: "",
+        city: "",
+        phone: phone,
+        email: "",
+        note: "",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    const petId = "p_"+uid();
+    pets.push({
+      id: petId,
+      customerId,
+      name: dogName || "(ohne Name)",
+      breed: "",
+      birthdate: "",
+      chip: false,
+      chipNumber: "",
+      vet: "",
+      emergencyContact: "",
+      note: d.note || "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    dogIdToCustomerId[d.id] = customerId;
+    dogIdToPetId[d.id] = petId;
+  });
+
+  // --- 2) docs[] -> stays[] + invoices[] (Spiegelung) ---
+  const stays = [];
+  const invoices = [];
+
+  (state.docs||[]).forEach(doc=>{
+    if(!doc || !doc.id) return;
+
+    if(doc.type === "invoice"){
+      const invId = "i_"+doc.id; // stabil/ableitbar
+      docIdToInvoiceId[doc.id] = invId;
+
+      invoices.push({
+        id: invId,
+        customerId: dogIdToCustomerId[doc.dogId] || "",
+        petId: dogIdToPetId[doc.dogId] || "",
+        stayId: "", // später: Aufenthalt-ID, wenn Rechnung eindeutig aus Aufenthalt erzeugt wird
+        sourceDocId: doc.sourceDocId || "",
+        invoiceNumber: doc.invoiceNumber || "",
+        invoiceDate: doc.invoiceDate || "",
+        period: doc.period || { from:"", to:"" },
+        items: doc.items || null, // falls später vorhanden
+        pricing: doc.pricing || null, // kompatibel mit Bestand
+        total: doc.total || doc.amount || null,
+        status: doc.status || doc.paymentStatus || "offen",
+        createdAt: doc.createdAt || new Date().toISOString(),
+        updatedAt: doc.updatedAt || new Date().toISOString()
+      });
+
+      return;
+    }
+
+    // normale Template-Dokumente (z.B. Hundeannahme)
+    if(doc.templateId){
+      const stayId = "s_"+doc.id;
+      docIdToStayId[doc.id] = stayId;
+
+      stays.push({
+        id: stayId,
+        petId: dogIdToPetId[doc.dogId] || "",
+        customerId: dogIdToCustomerId[doc.dogId] || "",
+        type: (doc.meta && doc.meta.betreuung) ? String(doc.meta.betreuung).toLowerCase() : "",
+        from: doc.meta?.von || "",
+        to: doc.meta?.bis || "",
+        fields: doc.fields || {},
+        meta: doc.meta || {},
+        signature: doc.signature || null,
+        status: doc.saved ? "closed" : "open",
+        docId: doc.id, // Rückverweis
+        createdAt: doc.createdAt || new Date().toISOString(),
+        updatedAt: doc.updatedAt || new Date().toISOString()
+      });
+    }
+  });
+
+  // Nur setzen, wenn wir tatsächlich etwas erzeugt haben – sonst nichts überschreiben.
+  if(customers.length) state.customers = customers;
+  if(pets.length) state.pets = pets;
+  if(stays.length) state.stays = stays;
+  if(invoices.length) state.invoices = invoices;
+
+  state._legacy.dogIdToCustomerId = dogIdToCustomerId;
+  state._legacy.dogIdToPetId = dogIdToPetId;
+  state._legacy.docIdToStayId = docIdToStayId;
+  state._legacy.docIdToInvoiceId = docIdToInvoiceId;
+
+  state.schemaVersion = 2;
+  saveState();
+}
+
+// ===== ETAPPE 2 Helpers (Customer/Pet Editor) =====
+const cpEdit = { mode: "new", petId: "" };
+
+function getCustomer(id){
+  return (state.customers||[]).find(c=>c.id===id) || null;
+}
+function getPet(id){
+  return (state.pets||[]).find(p=>p.id===id) || null;
+}
+
+function setCustomerFieldsDisabled(disabled){
+  ["c_name","c_phone","c_email","c_street","c_zip","c_city","c_note"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.disabled=!!disabled;
+  });
+}
+
+function refreshCustomerSelect(){
+  const sel = document.getElementById("customerSelect");
+  if(!sel) return;
+  const customers = (state.customers||[]).slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"de"));
+  sel.innerHTML = customers.map(c=>`<option value="${c.id}">${escapeHtml(c.name||"Kunde")}${c.phone?(" · "+escapeHtml(c.phone)):""}</option>`).join("");
+}
+
+function clearCpEditor(){
+  ["c_name","c_phone","c_email","c_street","c_zip","c_city","c_note","p_name","p_breed","p_chipNumber","p_note"].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value="";
+  });
+  const bd=document.getElementById("p_birthdate"); if(bd) bd.value="";
+  const chip=document.getElementById("p_chip"); if(chip) chip.checked=false;
+  const use=document.getElementById("useExistingCustomer"); if(use) use.checked=false;
+  const hint=document.getElementById("cpHint"); if(hint) hint.textContent="";
+  setCustomerFieldsDisabled(false);
+}
+
+function fillCpEditorForPet(pet){
+  const c = getCustomer(pet.customerId);
+  if(c){
+    $("#c_name").value = c.name||"";
+    $("#c_phone").value = c.phone||"";
+    $("#c_email").value = c.email||"";
+    $("#c_street").value = c.street||"";
+    $("#c_zip").value = c.zip||"";
+    $("#c_city").value = c.city||"";
+    $("#c_note").value = c.note||"";
+  }
+  $("#p_name").value = pet.name||"";
+  $("#p_breed").value = pet.breed||"";
+  $("#p_birthdate").value = pet.birthdate||"";
+  $("#p_chip").checked = !!pet.chip;
+  $("#p_chipNumber").value = pet.chipNumber||"";
+  $("#p_note").value = pet.note||"";
+}
+
+function openCpEditor(mode, petId){
+  ensureStateShape();
+  cpEdit.mode = mode || "new";
+  cpEdit.petId = petId || "";
+
+  const box = document.getElementById("cpEditor");
+  if(box) box.style.display="block";
+  const title = document.getElementById("cpEditorTitle");
+  if(title) title.textContent = (mode==="edit") ? "Kunde & Hund bearbeiten" : "Kunde & Hund anlegen";
+
+  refreshCustomerSelect();
+  clearCpEditor();
+
+  // Toggle handler
+  const use = document.getElementById("useExistingCustomer");
+  if(use){
+    use.onchange = ()=>{
+      const useExisting = use.checked;
+      setCustomerFieldsDisabled(useExisting);
+    };
+  }
+
+  if(mode==="edit" && petId){
+    const pet = getPet(petId);
+    if(pet){
+      // Bei Edit: bestehenden Kunden nutzen + auswählen
+      const useExisting = document.getElementById("useExistingCustomer");
+      if(useExisting) useExisting.checked = true;
+      refreshCustomerSelect();
+      const sel = document.getElementById("customerSelect");
+      if(sel) sel.value = pet.customerId || "";
+      setCustomerFieldsDisabled(false); // beim Edit darfst du den Kunden auch korrigieren
+      fillCpEditorForPet(pet);
+    }
+  } else {
+    // New: wenn Kunden vorhanden, Auswahl anbieten, aber standardmäßig aus
+    setCustomerFieldsDisabled(false);
+  }
+
+  const list = document.getElementById("dogList");
+  if(list) list.scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+function closeCpEditor(){
+  const box = document.getElementById("cpEditor");
+  if(box) box.style.display="none";
+  clearCpEditor();
+}
+
+function upsertLegacyDogForPet(pet, customer){
+  ensureDefaultDog();
+  if(!pet) return;
+
+  // 1) Existierendes Legacy-Dog finden (Mapping)
+  let dogId = null;
+  const map = state._legacy?.dogIdToPetId || {};
+  for(const did of Object.keys(map)){
+    if(map[did] === pet.id){ dogId = did; break; }
+  }
+
+  // 2) Falls nicht vorhanden: neu anlegen
+  if(!dogId){
+    dogId = "d_"+uid();
+    state.dogs.push({ id: dogId, name: pet.name||"", owner: customer?.name||"", phone: customer?.phone||"", note: pet.note||"" });
+  }
+
+  // 3) Update Legacy-Dog
+  const d = (state.dogs||[]).find(x=>x.id===dogId);
+  if(d){
+    d.name = pet.name || d.name;
+    d.owner = (customer?.name ?? d.owner) || "";
+    d.phone = (customer?.phone ?? d.phone) || "";
+    d.note = pet.note || d.note || "";
+  }
+
+  // 4) Mapping aktualisieren
+  state._legacy = state._legacy || {};
+  state._legacy.dogIdToPetId = state._legacy.dogIdToPetId || {};
+  state._legacy.dogIdToCustomerId = state._legacy.dogIdToCustomerId || {};
+  state._legacy.dogIdToPetId[dogId] = pet.id;
+  state._legacy.dogIdToCustomerId[dogId] = pet.customerId;
+
+  return dogId;
+}
+
+// ===== ETAPPE 3 Helpers: Hund auswählen -> Halter automatisch =====
+function getPetByDogId(dogId){
+  ensureStateShape();
+  const pid = state._legacy?.dogIdToPetId?.[dogId] || "";
+  return pid ? getPet(pid) : null;
+}
+function getCustomerByDogId(dogId){
+  ensureStateShape();
+  const cid = state._legacy?.dogIdToCustomerId?.[dogId] || "";
+  return cid ? getCustomer(cid) : null;
+}
+function getLegacyDogIdForPet(petId){
+  ensureStateShape();
+  const map = state._legacy?.dogIdToPetId || {};
+  for(const did of Object.keys(map)){
+    if(map[did] === petId) return did;
+  }
+  return "";
+}
+function ensureDocLinks(doc){
+  if(!doc) return;
+  ensureStateShape();
+  // Falls noch alte docs ohne petId/customerId existieren: aus dogId ableiten
+  if(!doc.petId && doc.dogId) doc.petId = state._legacy?.dogIdToPetId?.[doc.dogId] || "";
+  if(!doc.customerId && doc.dogId) doc.customerId = state._legacy?.dogIdToCustomerId?.[doc.dogId] || "";
+}
+function renderCustomerInfoForDogId(dogId){
+  const box = document.getElementById("customerInfo");
+  if(!box) return;
+  const pet = getPetByDogId(dogId);
+  const cust = getCustomerByDogId(dogId);
+  if(!pet && !cust){ box.textContent = ""; return; }
+
+  const parts = [];
+  if(cust){
+    const addr = [cust.street, [cust.zip, cust.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+    parts.push(`${cust.name||""}${cust.phone?" · "+cust.phone:""}${cust.email?" · "+cust.email:""}`.trim());
+    if(addr) parts.push(addr);
+  }
+  if(pet){
+    const chip = pet.chip ? (`Chip: ${pet.chipNumber||"ja"}`) : "kein Chip";
+    const breed = pet.breed ? ` · ${pet.breed}` : "";
+    parts.push(`${pet.name||"Hund"}${breed} · ${chip}`);
+  }
+  box.textContent = parts.filter(Boolean).join(" | ");
+}
+
+
+// ===== Ende Etappe 1 =====
 function escapeHtml(s){return String(s??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");}
 function overlaps(aFrom, aTo, bFrom, bTo){
   return !(aTo < bFrom || aFrom > bTo);
@@ -266,37 +615,68 @@ function renderOccupancy(){
 function getInvoices(){
   return state.docs.filter(d => d.type === "invoice");
 }
+
+function resolveInvoiceParties(inv){
+  ensureStateShape();
+  const cust = inv?.customerId ? getCustomer(inv.customerId) : (inv?.dogId ? getCustomerByDogId(inv.dogId) : null);
+  const pet  = inv?.petId ? getPet(inv.petId) : (inv?.dogId ? getPetByDogId(inv.dogId) : null);
+  const legacyDog = inv?.dogId ? (state.dogs||[]).find(d=>d.id===inv.dogId) : null;
+  return { cust, pet, legacyDog };
+}
+
+function formatCustomerLine(cust, legacyDog){
+  const name = cust?.name || legacyDog?.owner || "";
+  const phone = cust?.phone || legacyDog?.phone || "";
+  const email = cust?.email || "";
+  const parts = [name, phone, email].filter(Boolean);
+  return parts.join(" · ");
+}
+function formatCustomerAddressBlock(cust){
+  if(!cust) return "";
+  const l1 = cust.name || "";
+  const l2 = cust.street || "";
+  const l3 = [cust.zip, cust.city].filter(Boolean).join(" ");
+  return [l1,l2,l3].filter(Boolean).map(escapeHtml).join("<br>");
+}
 function renderInvoiceList(){
   const el = document.getElementById("invoiceList");
   if(!el) return;
 
   const invoices = getInvoices();
 
+  const actionBar = `
+    <div class="row" style="gap:10px;flex-wrap:wrap;margin:10px 0 14px">
+      <button class="btn" onclick="openFreeInvoiceForm()">➕ Freie Rechnung</button>
+    </div>
+  `;
+
   if(!invoices.length){
-    el.innerHTML = "<p>Noch keine Rechnungen vorhanden.</p>";
+    el.innerHTML = actionBar + "<p class='muted'>Noch keine Rechnungen vorhanden.</p>";
+    const view = document.getElementById("invoiceView");
+    if(view) view.innerHTML = "";
     return;
   }
 
-  el.innerHTML = `
+  el.innerHTML = actionBar + `
     <table class="invoice-table">
-     <thead>
-  <tr>
-    <th>Nr.</th>
-    <th>Zeitraum</th>
-    <th>Betrag</th>
-    <th>Status</th>
-  </tr>
-</thead>
-<tbody>
-  ${invoices.map(inv => `
-    <tr onclick="openInvoice('${inv.id}')">
- <td>${inv.invoiceNumber || "-"}</td>
-      <td>${inv.period.from} – ${inv.period.to}</td>
-      <td>${inv.pricing.total.toFixed(2)} €</td>
-      <td>${inv.status}</td>
-    </tr>
-  `).join("")}
-</tbody>
+      <thead>
+        <tr>
+          <th>Nr.</th>
+          <th>Zeitraum</th>
+          <th>Betrag</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${invoices.map(inv=>`
+          <tr onclick="openInvoice('${inv.id}')">
+            <td>${inv.invoiceNumber || "-"}</td>
+            <td>${escapeHtml(inv.period?.from||"")} – ${escapeHtml(inv.period?.to||"")}</td>
+            <td>${(inv.pricing?.total||0).toFixed(2)} €</td>
+            <td>${escapeHtml(inv.status||"")}</td>
+          </tr>
+        `).join("")}
+      </tbody>
     </table>
   `;
 }
@@ -307,58 +687,43 @@ function openInvoice(id){
   const el = document.getElementById("invoiceView");
   if(!el) return;
 
+  const {cust, pet, legacyDog} = resolveInvoiceParties(inv);
+  const custLine = escapeHtml(formatCustomerLine(cust, legacyDog) || "—");
+  const petLine = escapeHtml(pet?.name || (legacyDog?.name||"—"));
+
   el.innerHTML = `
     <div class="card">
-      <h3>Rechnung</h3>
+      <div class="row between" style="gap:10px;flex-wrap:wrap">
+        <h3 style="margin:0">Rechnung</h3>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <button class="smallbtn" onclick="setInvoiceStatus('${inv.id}','open')">Offen</button>
+          <button class="smallbtn" onclick="setInvoiceStatus('${inv.id}','paid')">Bezahlt</button>
+          <button class="smallbtn" onclick="setInvoiceStatus('${inv.id}','cancelled')">Storniert</button>
+        </div>
+      </div>
+
+      <p class="muted" style="margin-top:6px">
+        <strong>Nr.:</strong> ${escapeHtml(inv.invoiceNumber||"-")} ·
+        <strong>Datum:</strong> ${escapeHtml(new Date(inv.invoiceDate||Date.now()).toLocaleDateString("de-DE"))} ·
+        <strong>Status:</strong> ${escapeHtml(inv.status||"")}
+      </p>
+
+      <p><strong>Kunde:</strong> ${custLine}<br>
+         <strong>Hund:</strong> ${petLine}
+      </p>
 
       <p><strong>Zeitraum:</strong>
-        ${inv.period.from} – ${inv.period.to}
+        ${escapeHtml(inv.period?.from||"")} – ${escapeHtml(inv.period?.to||"")}
       </p>
 
-<p>
-  <strong>Status:</strong>
-  <span id="invoiceStatus">${inv.status}</span>
-</p>
-<div class="row">
-  <button class="btn" onclick="setInvoiceStatus('${inv.id}','paid')">
-    ✅ Als bezahlt markieren
-  </button>
-
-  <button class="btn secondary" onclick="setInvoiceStatus('${inv.id}','cancelled')">
-    ❌ Stornieren
-  </button>
-</div>
+      <p>Grundpreis: ${inv.pricing.basePrice.toFixed(2)} €</p>
+      <p>Zuschläge (%): ${inv.pricing.percentExtra.toFixed(2)} €</p>
+      <p>Zuschläge (fix): ${inv.pricing.fixedExtra.toFixed(2)} €</p>
 
       <hr>
+      <h3 style="margin:10px 0 8px">Gesamt: ${inv.pricing.total.toFixed(2)} €</h3>
 
-      <p>
-        ${inv.pricing.days} Tage ×
-        ${inv.pricing.daily.toFixed(2)} €
-      </p>
-
-      <p>
-        Grundpreis:
-        ${inv.pricing.base.toFixed(2)} €
-      </p>
-
-      <p>
-        Zuschläge (%):
-        ${inv.pricing.percentExtra}% →
-        ${inv.pricing.percentValue.toFixed(2)} €
-      </p>
-
-      <p>
-        Zuschläge (fix):
-        ${inv.pricing.fixedExtra.toFixed(2)} €
-      </p>
-
-      <hr>
-      <h3>Gesamt:
-        ${inv.pricing.total.toFixed(2)} €
-      </h3>
-<button class="btn" onclick="printInvoice('${inv.id}')">
-  🖨️ Rechnung drucken / PDF
-</button>
+      <button class="btn" onclick="printInvoice('${inv.id}')">🖨️ Rechnung drucken / PDF</button>
     </div>
   `;
 }
@@ -367,84 +732,284 @@ function setInvoiceStatus(id, status){
   if(!inv) return;
 
   inv.status = status;
+  inv.updatedAt = new Date().toISOString();
+
+  // v2 Spiegel
+  if(Array.isArray(state.invoices)){
+    const i2 = state.invoices.find(x=>x.id===id);
+    if(i2){
+      i2.status = status;
+      i2.updatedAt = inv.updatedAt;
+    }
+  }
+
   saveState();
 
   openInvoice(id);      // Detailansicht aktualisieren
   renderInvoiceList(); // Liste aktualisieren
 }
+
+// ===== ETAPPE 4: Freie Rechnung (Kunde/Hund auswählen statt tippen) =====
+function openFreeInvoiceForm(){
+  ensureStateShape();
+  const view = document.getElementById("invoiceView");
+  if(!view) return;
+
+  const customers = (state.customers||[]).slice().sort((a,b)=>(a.name||"").localeCompare(b.name||"","de"));
+  const hasCustomers = customers.length>0;
+
+  const today = new Date().toISOString().slice(0,10);
+
+  view.innerHTML = `
+    <div class="card">
+      <div class="row between" style="gap:10px;flex-wrap:wrap">
+        <h3 style="margin:0">Freie Rechnung</h3>
+        <button class="smallbtn" onclick="document.getElementById('invoiceView').innerHTML=''">Schließen</button>
+      </div>
+
+      ${hasCustomers ? "" : "<p class='muted'>Noch kein Kundenstamm vorhanden. Bitte zuerst unter Hunde/Kunden einen Kunden & Hund anlegen.</p>"}
+
+      <div class="row" style="gap:12px;flex-wrap:wrap;margin-top:10px">
+        <label class="field" style="min-width:260px">
+          <span>Kunde *</span>
+          <select id="freeInvCustomer" onchange="renderFreeInvoicePetOptions()">
+            <option value="">— Bitte auswählen —</option>
+            ${customers.map(c=>`<option value="${c.id}">${escapeHtml(c.name||"Kunde")}</option>`).join("")}
+          </select>
+        </label>
+
+        <label class="field" style="min-width:260px">
+          <span>Hund (optional)</span>
+          <select id="freeInvPet">
+            <option value="">—</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="row" style="gap:12px;flex-wrap:wrap">
+        <label class="field" style="min-width:200px">
+          <span>Von</span>
+          <input id="freeInvFrom" type="date" value="${today}">
+        </label>
+        <label class="field" style="min-width:200px">
+          <span>Bis</span>
+          <input id="freeInvTo" type="date" value="${today}">
+        </label>
+      </div>
+
+      <div class="row" style="gap:12px;flex-wrap:wrap">
+        <label class="field" style="min-width:260px">
+          <span>Beschreibung</span>
+          <input id="freeInvNote" type="text" placeholder="z.B. Gutschein / Training / Sonstiges">
+        </label>
+        <label class="field" style="min-width:200px">
+          <span>Betrag (€) *</span>
+          <input id="freeInvAmount" type="number" step="0.01" min="0" placeholder="0,00">
+        </label>
+      </div>
+
+      <div class="row" style="gap:10px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn" onclick="createFreeInvoice()">🧾 Rechnung erstellen</button>
+      </div>
+    </div>
+  `;
+
+  renderFreeInvoicePetOptions();
+}
+
+function renderFreeInvoicePetOptions(){
+  ensureStateShape();
+  const customerId = document.getElementById("freeInvCustomer")?.value || "";
+  const petSel = document.getElementById("freeInvPet");
+  if(!petSel) return;
+
+  const pets = (state.pets||[]).filter(p=>p.customerId===customerId).slice()
+    .sort((a,b)=>(a.name||"").localeCompare(b.name||"","de"));
+
+  petSel.innerHTML = `<option value="">—</option>` + pets.map(p=>`<option value="${p.id}">${escapeHtml(p.name||"Hund")}</option>`).join("");
+}
+
+function ensureLegacyDogForPetId(petId, customerId){
+  ensureStateShape();
+  if(!petId || !customerId) return "";
+
+  const map = state._legacy?.dogIdToPetId || {};
+  for(const dogId of Object.keys(map)){
+    if(map[dogId] === petId) return dogId;
+  }
+
+  const pet = getPet(petId);
+  const cust = getCustomer(customerId);
+
+  const dogId = uid();
+  state.dogs = state.dogs || [];
+  state.dogs.push({
+    id: dogId,
+    name: pet?.name || "Hund",
+    owner: cust?.name || "",
+    phone: cust?.phone || "",
+    note: ""
+  });
+
+  state._legacy.dogIdToPetId[dogId] = petId;
+  state._legacy.dogIdToCustomerId[dogId] = customerId;
+  return dogId;
+}
+
+function createFreeInvoice(){
+  ensureStateShape();
+  const customerId = document.getElementById("freeInvCustomer")?.value || "";
+  const petId = document.getElementById("freeInvPet")?.value || "";
+  const from = document.getElementById("freeInvFrom")?.value || "";
+  const to = document.getElementById("freeInvTo")?.value || "";
+  const note = (document.getElementById("freeInvNote")?.value || "").trim();
+  const amount = parseFloat(document.getElementById("freeInvAmount")?.value || "0");
+
+  if(!customerId){ alert("Bitte Kunde auswählen."); return; }
+  if(!(amount>0)){ alert("Bitte einen Betrag > 0 eingeben."); return; }
+
+  const year = new Date().getFullYear();
+  const number = String(state.nextInvoiceNumber).padStart(4, "0");
+  const dogId = petId ? ensureLegacyDogForPetId(petId, customerId) : "";
+
+  const invoice = {
+    id: uid(),
+    type: "invoice",
+
+    sourceDocId: "", // freie Rechnung
+    dogId,
+
+    customerId,
+    petId,
+
+    period: { from: from || "", to: to || "" },
+
+    pricing: {
+      basePrice: amount,
+      percentExtra: 0,
+      fixedExtra: 0,
+      total: amount
+    },
+
+    status: "draft",
+    note,
+
+    invoiceNumber: `${year}-${number}`,
+    invoiceDate: new Date().toISOString(),
+
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  state.docs.push(invoice);
+  state.invoices = Array.isArray(state.invoices) ? state.invoices : [];
+  state.invoices.push(invoice);
+
+  state.nextInvoiceNumber++;
+
+  saveState();
+  renderInvoiceList();
+  openInvoice(invoice.id);
+}
+
 function printInvoice(id){
   const inv = state.docs.find(d => d.id === id);
   if(!inv) return;
 
+  const {cust, pet, legacyDog} = resolveInvoiceParties(inv);
+
+  const recipient = formatCustomerAddressBlock(cust) || escapeHtml(cust?.name || legacyDog?.owner || "—");
+  const recipientSub = [
+    (cust?.phone || legacyDog?.phone) ? `Tel: ${escapeHtml(cust?.phone || legacyDog?.phone)}` : "",
+    cust?.email ? `Mail: ${escapeHtml(cust.email)}` : "",
+    (pet?.name || legacyDog?.name) ? `Hund: ${escapeHtml(pet?.name || legacyDog?.name)}` : "",
+    (pet?.chip || (pet?.chipNumber)) ? `Chip: ${escapeHtml(pet?.chipNumber || "ja")}` : ""
+  ].filter(Boolean).join("<br>");
+
   const w = window.open("", "_blank");
-w.document.write(`
+  w.document.write(`
 <html>
 <head>
   <title>Rechnung</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 40px; }
-    h1 { margin-top: 40px; }
-    .header { margin-bottom: 30px; }
+    h1 { margin-top: 26px; }
+    .header { margin-bottom: 20px; display:flex; justify-content:space-between; gap:20px; }
+    .block { font-size: 12px; color: #111; line-height:1.35; }
+    .company { font-size: 12px; color: #444; text-align:right; line-height:1.35; }
     .small { font-size: 12px; color: #444; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 18px; }
     td, th { border: 1px solid #ccc; padding: 8px; }
+    th { background: #f5f5f5; }
     .right { text-align: right; }
+    .muted { color:#666; font-size:11px; }
   </style>
 </head>
 <body>
 
   <div class="header">
-    <strong>${COMPANY.name}</strong><br>
-    ${COMPANY.owner}<br>
-    ${COMPANY.street}<br>
-    ${COMPANY.zipCity}<br>
-    Tel: ${COMPANY.phone}<br>
-    ${COMPANY.email}<br>
-    ${COMPANY.tax.vatId ? "USt-ID: " + COMPANY.tax.vatId + "<br>" : ""}
-    ${COMPANY.tax.taxNumber ? "Steuernr.: " + COMPANY.tax.taxNumber + "<br>" : ""}
+    <div class="block">
+      ${recipient}<br>
+      <span class="muted">${recipientSub}</span>
+    </div>
+    <div class="company">
+      <strong>${COMPANY.name}</strong><br>
+      ${COMPANY.owner}<br>
+      ${COMPANY.street}<br>
+      ${COMPANY.zipCity}<br>
+      Tel: ${COMPANY.phone}<br>
+      ${COMPANY.email}<br>
+      ${COMPANY.tax.vatId ? "USt-ID: " + COMPANY.tax.vatId + "<br>" : ""}
+      ${COMPANY.tax.taxNumber ? "Steuernr.: " + COMPANY.tax.taxNumber + "<br>" : ""}
+    </div>
   </div>
 
   <h1>Rechnung</h1>
-<p>
-  <strong>Rechnungsnummer:</strong> ${inv.invoiceNumber}<br>
-  <strong>Rechnungsdatum:</strong>
-  ${new Date(inv.invoiceDate).toLocaleDateString()}
-</p>
+  <p class="small">
+    <strong>Rechnungsnummer:</strong> ${inv.invoiceNumber || "-"}<br>
+    <strong>Rechnungsdatum:</strong> ${new Date(inv.invoiceDate||Date.now()).toLocaleDateString("de-DE")}<br>
+    <strong>Leistungszeitraum:</strong> ${escapeHtml(inv.period?.from||"")} – ${escapeHtml(inv.period?.to||"")}
+  </p>
 
-      <p><strong>Zeitraum:</strong>
-        ${inv.period.from} – ${inv.period.to}
-      </p>
+  <table>
+    <tr>
+      <th>Position</th>
+      <th class="right">Betrag</th>
+    </tr>
+    <tr>
+      <td>Grundpreis</td>
+      <td class="right">${inv.pricing.basePrice.toFixed(2)} €</td>
+    </tr>
+    <tr>
+      <td>Zuschläge (%)</td>
+      <td class="right">${inv.pricing.percentExtra.toFixed(2)} €</td>
+    </tr>
+    <tr>
+      <td>Zuschläge (fix)</td>
+      <td class="right">${inv.pricing.fixedExtra.toFixed(2)} €</td>
+    </tr>
+    <tr>
+      <th>Gesamt</th>
+      <th class="right">${inv.pricing.total.toFixed(2)} €</th>
+    </tr>
+  </table>
 
-      <table>
-        <tr>
-          <th>Position</th>
-          <th class="right">Betrag</th>
-        </tr>
-        <tr>
-          <td>Grundpreis</td>
-          <td class="right">${inv.pricing.base.toFixed(2)} €</td>
-        </tr>
-        <tr>
-          <td>Zuschläge (%)</td>
-          <td class="right">${inv.pricing.percentValue.toFixed(2)} €</td>
-        </tr>
-        <tr>
-          <td>Zuschläge (fix)</td>
-          <td class="right">${inv.pricing.fixedExtra.toFixed(2)} €</td>
-        </tr>
-        <tr>
-          <th>Gesamt</th>
-          <th class="right">${inv.pricing.total.toFixed(2)} €</th>
-        </tr>
-      </table>
+  <p class="small" style="margin-top:18px">
+    Bitte überweise den Rechnungsbetrag unter Angabe der Rechnungsnummer auf folgendes Konto:<br>
+    <strong>${COMPANY.bank.name}</strong><br>
+    IBAN: ${COMPANY.bank.iban}<br>
+    BIC: ${COMPANY.bank.bic}<br>
+    <br>
+    Vielen Dank!
+  </p>
 
-      <script>
-        window.print();
-        window.onafterprint = () => window.close();
-      </script>
+  <script>
+    window.print();
+    window.onafterprint = () => window.close();
+  </script>
 
-    </body>
-    </html>
+</body>
+</html>
   `);
 
   w.document.close();
@@ -465,43 +1030,156 @@ function syncDogSelect(){
   }).join("");
 }
 function renderDogs(){
-  ensureDefaultDog();
-  const list=$("#dogList");
-  list.innerHTML="";
-  const dogs=state.dogs.filter(d=>!d.isPlaceholder);
-  dogs.forEach(d=>{
-    const el=document.createElement("div");
-    el.className="item";
-    el.innerHTML=`<div><strong>${escapeHtml(d.name)}</strong><small>${escapeHtml(d.owner||"")} · ${escapeHtml(d.phone||"")}</small></div>
-      <div class="actions"><button class="smallbtn" data-e="1">Bearbeiten</button><button class="smallbtn" data-d="1">Löschen</button></div>`;
-    el.querySelector('[data-e="1"]').onclick=()=>editDog(d.id);
-    el.querySelector('[data-d="1"]').onclick=()=>{
-      if(confirm("Hund/Kunde wirklich löschen?")){
-        state.dogs=state.dogs.filter(x=>x.id!==d.id);
-        saveState(); renderDogs();
-      }
-    };
-    list.appendChild(el);
-  });
-  if(!dogs.length) list.innerHTML=`<div class="muted">Noch keine Hunde/Kunden angelegt.</div>`;
+  // Etappe 2: primär pets/customers anzeigen, fallback auf legacy dogs
+  ensureStateShape();
+  const list = $("#dogList");
+  if(!list) return;
+  list.innerHTML = "";
+
+  const pets = (state.pets||[]).slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"de"));
+
+  if(pets.length){
+    pets.forEach(p=>{
+      const c = getCustomer(p.customerId);
+      const el = document.createElement("div");
+      el.className = "item";
+      const chipTxt = p.chip ? (` · Chip: ${escapeHtml(p.chipNumber||"ja")}`) : "";
+      el.innerHTML = `<div><strong>${escapeHtml(p.name||"Hund")}</strong><small>${escapeHtml(c?.name||"")} · ${escapeHtml(c?.phone||"")}${chipTxt}</small></div>
+        <div class="actions"><button class="smallbtn" data-e="1">Bearbeiten</button><button class="smallbtn" data-d="1">Löschen</button></div>`;
+      el.querySelector('[data-e="1"]').onclick = ()=>openCpEditor("edit", p.id);
+      el.querySelector('[data-d="1"]').onclick = ()=>{
+        if(confirm("Hund wirklich löschen? (Aufenthalte/Rechnungen bleiben als Historie bestehen)")){
+          state.pets = state.pets.filter(x=>x.id!==p.id);
+          // legacy dog nicht automatisch löschen (Sicherheit), aber Mapping entfernen
+          for(const dogId of Object.keys(state._legacy?.dogIdToPetId||{})){
+            if(state._legacy.dogIdToPetId[dogId]===p.id){
+              delete state._legacy.dogIdToPetId[dogId];
+              delete state._legacy.dogIdToCustomerId[dogId];
+            }
+          }
+          saveState(); renderDogs(); syncDogSelect();
+        }
+      };
+      list.appendChild(el);
+    });
+  } else {
+    // fallback legacy
+    ensureDefaultDog();
+    const dogs = state.dogs.filter(d=>!d.isPlaceholder);
+    dogs.forEach(d=>{
+      const el=document.createElement("div");
+      el.className="item";
+      el.innerHTML=`<div><strong>${escapeHtml(d.name)}</strong><small>${escapeHtml(d.owner||"")} · ${escapeHtml(d.phone||"")}</small></div>
+        <div class="actions"><button class="smallbtn" data-e="1">Bearbeiten</button><button class="smallbtn" data-d="1">Löschen</button></div>`;
+      el.querySelector('[data-e="1"]').onclick=()=>openCpEditor("new"); // legacy fallback: einfach neu anlegen
+      el.querySelector('[data-d="1"]').onclick=()=>{
+        if(confirm("Hund/Kunde wirklich löschen?")){
+          state.dogs=state.dogs.filter(x=>x.id!==d.id);
+          saveState(); renderDogs();
+        }
+      };
+      list.appendChild(el);
+    });
+    if(!dogs.length) list.innerHTML=`<div class="muted">Noch keine Hunde/Kunden angelegt.</div>`;
+  }
+
+  refreshCustomerSelect();
   syncDogSelect();
 }
-$("#btnAddDog").addEventListener("click",()=>{
-  const name=prompt("Name Hund (z.B. Bello):");
-  if(!name) return;
-  const owner=prompt("Name Halter (z.B. Müller):")||"";
-  const phone=prompt("Telefon Halter:")||"";
-  state.dogs.push({id:uid(),name,owner,phone,note:""});
-  saveState(); renderDogs();
+
+$("#btnAddDog").addEventListener("click",()=>openCpEditor("new"));
+
+$("#btnCpCancel").addEventListener("click",()=>closeCpEditor());
+
+$("#btnCpSave").addEventListener("click",()=>{
+  ensureStateShape();
+
+  const mode = cpEdit.mode;
+  const useExisting = $("#useExistingCustomer").checked && (state.customers||[]).length>0;
+
+  let customer = null;
+  let customerId = "";
+
+  if(useExisting && $("#customerSelect").value){
+    customerId = $("#customerSelect").value;
+    customer = getCustomer(customerId);
+  } else {
+    const name = $("#c_name").value.trim();
+    if(!name){ alert("Bitte Kundennamen eintragen."); return; }
+    customer = {
+      id: uid(),
+      name,
+      phone: $("#c_phone").value.trim(),
+      email: $("#c_email").value.trim(),
+      street: $("#c_street").value.trim(),
+      zip: $("#c_zip").value.trim(),
+      city: $("#c_city").value.trim(),
+      note: $("#c_note").value.trim(),
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    state.customers.push(customer);
+    customerId = customer.id;
+  }
+
+  const petName = $("#p_name").value.trim();
+  if(!petName){ alert("Bitte Hundename eintragen."); return; }
+
+  if(mode==="edit" && cpEdit.petId){
+    const pet = getPet(cpEdit.petId);
+    if(!pet){ alert("Hund nicht gefunden."); return; }
+
+    // Update customer (wenn Felder aktiv / edit)
+    if(customer && customer.id){
+      customer.name = $("#c_name").value.trim() || customer.name;
+      customer.phone = $("#c_phone").value.trim();
+      customer.email = $("#c_email").value.trim();
+      customer.street = $("#c_street").value.trim();
+      customer.zip = $("#c_zip").value.trim();
+      customer.city = $("#c_city").value.trim();
+      customer.note = $("#c_note").value.trim();
+      customer.updatedAt = Date.now();
+    }
+
+    pet.customerId = customerId || pet.customerId;
+    pet.name = petName;
+    pet.breed = $("#p_breed").value.trim();
+    pet.birthdate = $("#p_birthdate").value;
+    pet.chip = $("#p_chip").checked;
+    pet.chipNumber = $("#p_chipNumber").value.trim();
+    pet.note = $("#p_note").value.trim();
+    pet.updatedAt = Date.now();
+
+    upsertLegacyDogForPet(pet, getCustomer(pet.customerId));
+    saveState();
+    closeCpEditor();
+    renderDogs();
+    return;
+  }
+
+  // mode new: create pet
+  const pet = {
+    id: uid(),
+    customerId,
+    name: petName,
+    breed: $("#p_breed").value.trim(),
+    birthdate: $("#p_birthdate").value,
+    chip: $("#p_chip").checked,
+    chipNumber: $("#p_chipNumber").value.trim(),
+    note: $("#p_note").value.trim(),
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+  state.pets.push(pet);
+
+  upsertLegacyDogForPet(pet, getCustomer(customerId));
+
+  state.schemaVersion = Math.max(state.schemaVersion||1, 2);
+  saveState();
+  closeCpEditor();
+  renderDogs();
 });
-function editDog(id){
-  const d=state.dogs.find(x=>x.id===id);
-  if(!d) return;
-  d.name=prompt("Name Hund:",d.name) ?? d.name;
-  d.owner=prompt("Name Halter:",d.owner||"") ?? (d.owner||"");
-  d.phone=prompt("Telefon:",d.phone||"") ?? (d.phone||"");
-  saveState(); renderDogs();
-}
+
 
 function renderDocs(){
   const list=$("#docList");
@@ -539,13 +1217,27 @@ $("#btnNewDoc").addEventListener("click",()=>createDoc($("#templateSelect").valu
 function createDoc(tid){
   const t=getTemplate(tid);
   if(!t) return;
+  ensureStateShape();
+  // Etappe 3: Standardauswahl = erster Hund aus neuem Stamm (falls vorhanden)
+  let defaultDogId = state.dogs?.[0]?.id || "";
+  if((state.pets||[]).length){
+    const pet = state.pets[0];
+    const legacyDogId = getLegacyDogIdForPet(pet.id);
+    if(legacyDogId){
+      defaultDogId = legacyDogId;
+    } else {
+      const cust = getCustomer(pet.customerId);
+      defaultDogId = upsertLegacyDogForPet(pet, cust) || defaultDogId;
+    }
+  }
   const now = new Date().toISOString();
-  const docObj={id:uid(),templateId:t.id,templateName:t.name,title:t.name,dogId:state.dogs?.[0]?.id||"",fields:{},signature: null,saved: false,
+  const docObj={id:uid(),templateId:t.id,templateName:t.name,title:t.name,dogId:defaultDogId,petId:"",customerId:"",fields:{},signature: null,saved: false,
 versionOf: null,meta: {
   betreuung: "",
   von: "",
   bis: ""
 },createdAt:now,updatedAt:now};
+  ensureDocLinks(docObj);
   state.docs=state.docs||[];
   state.docs.unshift(docObj);
   saveState();
@@ -589,12 +1281,14 @@ function openDoc(id){
 updateCreateInvoiceButton();
   currentDoc=(state.docs||[]).find(d=>d.id===id);
   if(!currentDoc) return;
+  ensureDocLinks(currentDoc);
 normalizeMeta(currentDoc);
   $("#editorTitle").textContent=currentDoc.title||"Dokument";
   $("#editorMeta").textContent=currentDoc.templateName;
   $("#docName").value=currentDoc.title||"";
   syncDogSelect();
   $("#dogSelect").value=currentDoc.dogId||state.dogs?.[0]?.id||"";
+  renderCustomerInfoForDogId($("#dogSelect").value);
   renderEditor(currentDoc);
 renderVersions(currentDoc);
   
@@ -681,6 +1375,10 @@ $("#dogSelect").addEventListener("change", () => {
   if (currentDoc.saved) {
     forkDocument();
   }
+  // Etappe 3: Halter-/Hund-Info anzeigen + doc verknüpfen
+  currentDoc.dogId = $("#dogSelect").value;
+  ensureDocLinks(currentDoc);
+  renderCustomerInfoForDogId(currentDoc.dogId);
   dirty = true;
 });
 
@@ -704,6 +1402,9 @@ function collectForm(){
 }
 function validate(docObj,t){
   const errs=[];
+  // Etappe 3: Hund muss gewählt sein (nicht Placeholder)
+  const d = (state.dogs||[]).find(x=>x.id===docObj.dogId);
+  if(!docObj.dogId || (d && d.isPlaceholder)) errs.push("Hund");
   t.sections.forEach(sec=>sec.fields.forEach(f=>{
     if(!f.required) return;
     const v=docObj.fields[f.key];
@@ -736,6 +1437,7 @@ updateCreateInvoiceButton();
   const {fields, meta}=collectForm();
   currentDoc.title=$("#docName").value.trim()||currentDoc.templateName;
   currentDoc.dogId=$("#dogSelect").value;
+  ensureDocLinks(currentDoc);
   currentDoc.fields=fields;
 currentDoc.meta=meta;
 
@@ -804,6 +1506,10 @@ function createInvoiceFromDoc(doc){
     sourceDocId: doc.id,
     dogId: doc.dogId,
 
+    // Etappe 4: Verknüpfung zum Kundenstamm (für Druck/Archiv)
+    customerId: (doc.customerId || getCustomerByDogId(doc.dogId)?.id || ""),
+    petId: (doc.petId || getPetByDogId(doc.dogId)?.id || ""),
+
     period: {
       from: doc.meta.von,
       to: doc.meta.bis
@@ -821,6 +1527,8 @@ function createInvoiceFromDoc(doc){
   };
 
   state.docs.push(invoice);
+  state.invoices = Array.isArray(state.invoices) ? state.invoices : [];
+  state.invoices.push(invoice);
   state.nextInvoiceNumber++;
 
   saveState();
@@ -990,6 +1698,8 @@ $("#btnWipe").addEventListener("click",()=>{
 
 (async function boot(){
   await loadTemplates();
+  ensureStateShape();
+  migrateToV2();
   ensureDefaultDog();
   saveState();
   renderDogs();
