@@ -259,18 +259,11 @@ function normalizeTemplate(t){
 }
 
 async function loadTemplates(){
-  const [res1, res2] = await Promise.all([
-    fetch("templates/hundeannahme.json"),
-    fetch("templates/rechnung.json")
-  ]);
-
+  const res1 = await fetch("templates/hundeannahme.json");
   if(!res1.ok) throw new Error("Konnte templates/hundeannahme.json nicht laden ("+res1.status+")");
-  if(!res2.ok) throw new Error("Konnte templates/rechnung.json nicht laden ("+res2.status+")");
 
   const t1 = normalizeTemplate(await res1.json());
-  const t2 = normalizeTemplate(await res2.json());
-
-  templates = [t1, t2];
+  templates = [t1];
 
   const sel = document.getElementById("templateSelect");
   if (sel) {
@@ -444,6 +437,22 @@ function migrateToV2(){
   saveState();
 }
 
+
+function pruneInvoiceDocs(){
+  // Variante A: Rechnungen gehören ausschließlich in state.invoices (Rechnungs-Tab),
+  // nicht in state.docs (Aufenthalte). Damit bleibt "Aufenthalte" übersichtlich.
+  if(!Array.isArray(state.docs)) state.docs = [];
+  const invDocs = state.docs.filter(d=>d && d.type==="invoice");
+  if(invDocs.length){
+    state.invoices = Array.isArray(state.invoices) ? state.invoices : [];
+    invDocs.forEach(inv=>{
+      if(!state.invoices.some(x=>x.id===inv.id)){
+        state.invoices.push(inv);
+      }
+    });
+    state.docs = state.docs.filter(d=>!(d && d.type==="invoice"));
+  }
+}
 // ===== ETAPPE 2 Helpers (Customer/Pet Editor) =====
 const cpEdit = { mode: "new", petId: "" };
 
@@ -810,7 +819,13 @@ function renderOccupancy(){
   `;
 }
 function getInvoices(){
-  return state.docs.filter(d => d.type === "invoice");
+  ensureStateShape();
+  return (state.invoices||[]).slice().sort((a,b)=> (b.updatedAt||"").localeCompare(a.updatedAt||""));
+}
+
+function getInvoiceById(id){
+  ensureStateShape();
+  return (state.invoices||[]).find(x=>x.id===id) || null;
 }
 
 function resolveInvoiceParties(inv){
@@ -859,6 +874,7 @@ function renderInvoiceList(){
       <thead>
         <tr>
           <th>Nr.</th>
+          <th>Kunde / Hund</th>
           <th>Zeitraum</th>
           <th>Betrag</th>
           <th>Status</th>
@@ -868,6 +884,7 @@ function renderInvoiceList(){
         ${invoices.map(inv=>`
           <tr onclick="openInvoice('${inv.id}')">
             <td>${inv.invoiceNumber || "-"}</td>
+            <td>${escapeHtml((resolveInvoiceParties(inv).cust?.name || resolveInvoiceParties(inv).legacyDog?.owner || "—"))} · ${escapeHtml((resolveInvoiceParties(inv).pet?.name || resolveInvoiceParties(inv).legacyDog?.name || "—"))}</td>
             <td>${escapeHtml(inv.period?.from||"")} – ${escapeHtml(inv.period?.to||"")}</td>
             <td>${(inv.pricing?.total||0).toFixed(2)} €</td>
             <td>${escapeHtml(inv.status||"")}</td>
@@ -878,7 +895,7 @@ function renderInvoiceList(){
   `;
 }
 function openInvoice(id){
-  const inv = state.docs.find(d => d.id === id);
+  const inv = getInvoiceById(id);
   if(!inv) return;
 
   const el = document.getElementById("invoiceView");
@@ -925,25 +942,15 @@ function openInvoice(id){
   `;
 }
 function setInvoiceStatus(id, status){
-  const inv = state.docs.find(d => d.id === id);
+  const inv = getInvoiceById(id);
   if(!inv) return;
 
   inv.status = status;
   inv.updatedAt = new Date().toISOString();
-
-  // v2 Spiegel
-  if(Array.isArray(state.invoices)){
-    const i2 = state.invoices.find(x=>x.id===id);
-    if(i2){
-      i2.status = status;
-      i2.updatedAt = inv.updatedAt;
-    }
-  }
-
   saveState();
 
-  openInvoice(id);      // Detailansicht aktualisieren
-  renderInvoiceList(); // Liste aktualisieren
+  openInvoice(id);
+  renderInvoiceList();
 }
 
 // ===== ETAPPE 4: Freie Rechnung (Kunde/Hund auswählen statt tippen) =====
@@ -1098,7 +1105,6 @@ function createFreeInvoice(){
     updatedAt: new Date().toISOString()
   };
 
-  state.docs.push(invoice);
   state.invoices = Array.isArray(state.invoices) ? state.invoices : [];
   state.invoices.push(invoice);
 
@@ -1110,7 +1116,7 @@ function createFreeInvoice(){
 }
 
 function printInvoice(id){
-  const inv = state.docs.find(d => d.id === id);
+  const inv = getInvoiceById(id);
   if(!inv) return;
 
   const {cust, pet, legacyDog} = resolveInvoiceParties(inv);
@@ -1414,35 +1420,98 @@ $("#btnCpSave").addEventListener("click",()=>{
 function renderDocs(){
   const list=$("#docList");
   list.innerHTML="";
-  const docs=(state.docs||[]).slice().sort((a,b)=>b.updatedAt-a.updatedAt);
+  const docs=(state.docs||[]).filter(d=>d.type!=="invoice").slice().sort((a,b)=> (b.updatedAt||"").localeCompare(a.updatedAt||""));
   docs.forEach(d=>list.appendChild(docItem(d)));
-  if(!docs.length) list.innerHTML=`<div class="muted">Noch keine Dokumente erstellt.</div>`;
+  if(!docs.length) list.innerHTML=`<div class="muted">Noch keine Aufenthalte erstellt.</div>`;
   renderRecent();
 }
 function renderRecent(){
   const list=$("#recentList");
-  const docs=(state.docs||[]).slice().sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,3);
+  const docs=(state.docs||[]).filter(d=>d.type!=="invoice").slice().sort((a,b)=> (b.updatedAt||"").localeCompare(a.updatedAt||"")).slice(0,3);
   list.innerHTML="";
   docs.forEach(d=>list.appendChild(docItem(d)));
-  if(!docs.length) list.innerHTML=`<div class="muted">Noch keine Dokumente.</div>`;
+  if(!docs.length) list.innerHTML=`<div class="muted">Noch keine Aufenthalte.</div>`;
 }
 function docItem(d){
   const el=document.createElement("div");
   el.className="item";
   const dt=new Date(d.updatedAt).toLocaleString("de-DE");
-  el.innerHTML=`<div><strong>${escapeHtml(d.title||"Dokument")}</strong><small>${escapeHtml(d.templateName)} · zuletzt: ${dt}</small></div>
-    <div class="actions"><button class="smallbtn" data-o="1">Öffnen</button><button class="smallbtn" data-p="1">PDF</button><button class="smallbtn" data-x="1">Löschen</button></div>`;
-  el.querySelector('[data-o="1"]').onclick=()=>openDoc(d.id);
-  el.querySelector('[data-p="1"]').onclick=()=>{openDoc(d.id); setTimeout(()=>printDoc(),150);};
-  el.querySelector('[data-x="1"]').onclick=()=>{
-    if(confirm("Dokument wirklich löschen?")){
+  const subtitle = `${escapeHtml(d.templateName||"")}${d.saved ? " · abgeschlossen" : " · offen"} · zuletzt: ${dt}`;
+  const actions = document.createElement("div");
+  actions.className = "actions";
+
+  const btnOpen = document.createElement("button");
+  btnOpen.className = "smallbtn";
+  btnOpen.textContent = "Öffnen";
+  btnOpen.onclick = ()=>openDoc(d.id);
+
+  const btnPdf = document.createElement("button");
+  btnPdf.className = "smallbtn";
+  btnPdf.textContent = "PDF";
+  btnPdf.onclick = ()=>{openDoc(d.id); setTimeout(()=>printDoc(),150);};
+
+  const btnDelete = document.createElement("button");
+  btnDelete.className = "smallbtn";
+  btnDelete.textContent = "Löschen";
+  btnDelete.onclick = ()=>{
+    if(confirm("Aufenthalt wirklich löschen?")){
       state.docs=state.docs.filter(x=>x.id!==d.id);
       saveState(); renderDocs();
     }
   };
+
+  actions.appendChild(btnOpen);
+  actions.appendChild(btnPdf);
+
+  // Abschluss: Schnell neuen Aufenthalt als Kopie anlegen
+  if(d.saved){
+    const btnNew = document.createElement("button");
+    btnNew.className = "smallbtn";
+    btnNew.textContent = "➕ Neuer Aufenthalt";
+    btnNew.onclick = ()=>{
+      createStayFromExisting(d.id);
+    };
+    actions.appendChild(btnNew);
+  }
+
+  actions.appendChild(btnDelete);
+
+  el.innerHTML = `<div><strong>${escapeHtml(d.title||"Aufenthalt")}</strong><small>${subtitle}</small></div>`;
+  el.appendChild(actions);
   return el;
 }
 
+function createStayFromExisting(docId){
+  const src = (state.docs||[]).find(x=>x.id===docId);
+  if(!src) return;
+
+  const t = getTemplate(src.templateId);
+  const now = new Date().toISOString();
+  const copy = JSON.parse(JSON.stringify(src));
+
+  copy.id = uid();
+  copy.saved = false;
+  copy.signature = null;
+  copy.versionOf = null;
+
+  // Zeitraum/Meta neu
+  copy.meta = copy.meta || {};
+  copy.meta.von = "";
+  copy.meta.bis = "";
+  // Betreuungstyp mitnehmen (spart Klicks)
+  copy.meta.betreuung = src.meta?.betreuung || "";
+
+  // Preis neu berechnen wenn Zeitraum gesetzt wird
+  delete copy.pricing;
+
+  copy.createdAt = now;
+  copy.updatedAt = now;
+  copy.title = (t?.name || src.title || "Aufenthalt");
+
+  state.docs.unshift(copy);
+  saveState();
+  openDoc(copy.id);
+}
 $("#btnNewDoc").addEventListener("click",()=>createDoc($("#templateSelect").value));
 function createDoc(tid){
   const t=getTemplate(tid);
@@ -1660,18 +1729,9 @@ function validate(docObj,t){
 }
 function updateCreateInvoiceButton(){
   const btn = document.getElementById("btnCreateInvoice");
-  if(!btn) return;
-
-  const ok =
-    currentDoc &&
-    currentDoc.saved &&
-    currentDoc.pricing &&
-    !state.docs.some(d =>
-      d.type === "invoice" && d.sourceDocId === currentDoc.id
-    );
-
-  btn.style.display = ok ? "inline-block" : "none";
+  if(btn) btn.style.display = "none";
 }
+
 function saveCurrent(alertOk){
 updateCreateInvoiceButton();
   if(!currentDoc) return false;
@@ -1716,7 +1776,16 @@ if (!currentDoc.signature){
   return false;
 }
   currentDoc.saved = true;                             // 🔐 Dokument abschließen
-currentDoc.updatedAt = new Date().toISOString();     // sauberer Zeitstempel
+currentDoc.updatedAt = new Date().toISOString();
+
+// 🧾 Variante A: Rechnung automatisch beim Abschließen erstellen
+if(currentDoc.pricing){
+  const exists = (state.invoices||[]).some(x=>x.sourceDocId===currentDoc.id);
+  if(!exists){
+    createInvoiceFromDoc(currentDoc);
+  }
+}
+     // sauberer Zeitstempel
 
 saveState();renderOccupancy(); renderTodayStatus();                                         // EINMAL speichern
 dirty = false;
@@ -1728,13 +1797,6 @@ renderDocs();
 return true;
 
 }
-document.getElementById("btnCreateInvoice")
-  ?.addEventListener("click", () => {
-    if(!currentDoc) return;
-    createInvoiceFromDoc(currentDoc);
-    alert("Rechnung wurde erstellt");
-    updateCreateInvoiceButton();
-  });
 function createInvoiceFromDoc(doc){
   if(!doc || !doc.pricing) return;
 
@@ -1768,7 +1830,6 @@ function createInvoiceFromDoc(doc){
     updatedAt: new Date().toISOString()
   };
 
-  state.docs.push(invoice);
   state.invoices = Array.isArray(state.invoices) ? state.invoices : [];
   state.invoices.push(invoice);
   state.nextInvoiceNumber++;
@@ -1942,10 +2003,12 @@ $("#btnWipe").addEventListener("click",()=>{
   await loadTemplates();
   ensureStateShape();
   migrateToV2();
+  pruneInvoiceDocs();
   ensureDefaultDog();
   saveState();
   renderDogs();
   renderDocs();
+  renderInvoiceList();
   showPanel("home");
 })();
 
