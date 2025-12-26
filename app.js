@@ -4,6 +4,88 @@ const CAPACITY = {
   Urlaubsbetreuung: 10
 };
 
+/* ===== Weg 2B: Cloud Sync + Login (Firebase) =====
+   - Wenn window.firebaseConfig gesetzt ist: Login anzeigen + State aus Cloud laden/syncen
+   - Wenn nicht: App läuft wie bisher rein lokal/offline
+*/
+const CLOUD = {
+  enabled: false,
+  app: null,
+  auth: null,
+  db: null,
+  orgId: (window.firebaseOrgId || "doggystyle"),
+  adminEmails: (window.firebaseAdminEmails || []),
+  user: null,
+  role: "local",
+  _pushTimer: null,
+  _lastRemoteStamp: 0
+};
+
+function cloudIsEnabled(){
+  return !!(window.firebaseConfig && window.firebase && window.firebase.initializeApp);
+}
+
+function showAuthGate(show){
+  const el = document.getElementById("authGate");
+  if(!el) return;
+  el.style.display = show ? "flex" : "none";
+}
+
+function setAuthMsg(msg){
+  const el = document.getElementById("authMsg");
+  if(el) el.textContent = msg || "";
+}
+
+async function cloudInit(){
+  if(!cloudIsEnabled()) return false;
+  try{
+    CLOUD.enabled = true;
+    CLOUD.app = window.firebase.initializeApp(window.firebaseConfig);
+    CLOUD.auth = window.firebase.auth();
+    CLOUD.db = window.firebase.firestore();
+    return true;
+  }catch(err){
+    console.error("Firebase init failed", err);
+    CLOUD.enabled = false;
+    return false;
+  }
+}
+
+function cloudStateRef(){
+  // Ein Dokument pro "Org" (Hof/Workspace). Später kann man das auf mehrere Workspaces erweitern.
+  return CLOUD.db.collection("orgs").doc(CLOUD.orgId).collection("meta").doc("workspace_state");
+}
+
+async function cloudLoadState(){
+  if(!CLOUD.enabled) return null;
+  const snap = await cloudStateRef().get();
+  if(!snap.exists) return null;
+  const data = snap.data();
+  if(!data || !data.payload) return null;
+  CLOUD._lastRemoteStamp = Number(data.updatedAt || 0);
+  return data.payload;
+}
+
+function cloudSchedulePush(){
+  if(!CLOUD.enabled) return;
+  clearTimeout(CLOUD._pushTimer);
+  CLOUD._pushTimer = setTimeout(()=>cloudPushNow().catch(console.error), 700);
+}
+
+async function cloudPushNow(){
+  if(!CLOUD.enabled) return;
+  if(!CLOUD.user) return;
+  const stamp = Date.now();
+  // Marker im State, damit wir Remote-Updates sauber vergleichen können
+  try{ state._cloudUpdatedAt = stamp; }catch(_){/* ignore */}
+  // last write wins (v1). Später: echtes Merge pro Objekt.
+  await cloudStateRef().set({
+    payload: state,
+    updatedAt: stamp,
+    updatedBy: CLOUD.user.email || CLOUD.user.uid
+  }, {merge: true});
+}
+
 // ===== PREISLOGIK & STAFFELUNGEN =====
 const PRICE_RULES = {
   Tagesbetreuung: [
@@ -1218,7 +1300,11 @@ function printInvoice(id){
   w.document.close();
 }
 function loadState(){try{const raw=localStorage.getItem(LS_KEY);return raw?JSON.parse(raw):{dogs:[],docs:[]};}catch{return {dogs:[],docs:[]};}}
-function saveState(){localStorage.setItem(LS_KEY,JSON.stringify(state));}
+function saveState(){
+  localStorage.setItem(LS_KEY,JSON.stringify(state));
+  // Cloud Sync (Weg 2B): Änderungen nach außen spiegeln
+  if(CLOUD.enabled) cloudSchedulePush();
+}
 
 function ensureDefaultDog(){
   if(!state.dogs || state.dogs.length===0){
@@ -1999,7 +2085,7 @@ $("#btnWipe").addEventListener("click",()=>{
   location.reload();
 });
 
-(async function boot(){
+async function boot(){
   await loadTemplates();
   ensureStateShape();
   migrateToV2();
@@ -2010,7 +2096,115 @@ $("#btnWipe").addEventListener("click",()=>{
   renderDocs();
   renderInvoiceList();
   showPanel("home");
-})();
+}
+
+async function startApp(){
+  // 1) Wenn Cloud aktiviert: Login + Sync
+  const cloudOk = await cloudInit();
+  if(!cloudOk){
+    showAuthGate(false);
+    await boot();
+    return;
+  }
+
+  // Login UI wiring
+  const btnLogin = document.getElementById("btnLogin");
+  const btnRegister = document.getElementById("btnRegister");
+  const btnLogout = document.getElementById("btnLogout");
+  const loginEmail = document.getElementById("loginEmail");
+  const loginPass = document.getElementById("loginPass");
+
+  if(btnLogin) btnLogin.onclick = async ()=>{
+    setAuthMsg("");
+    try{
+      await CLOUD.auth.signInWithEmailAndPassword((loginEmail?.value||"").trim(), loginPass?.value||"");
+    }catch(e){
+      console.error(e);
+      setAuthMsg(e.message||"Login fehlgeschlagen");
+    }
+  };
+  if(btnRegister) btnRegister.onclick = async ()=>{
+    setAuthMsg("");
+    try{
+      await CLOUD.auth.createUserWithEmailAndPassword((loginEmail?.value||"").trim(), loginPass?.value||"");
+      setAuthMsg("Account erstellt. Bitte anmelden.");
+    }catch(e){
+      console.error(e);
+      setAuthMsg(e.message||"Registrierung fehlgeschlagen");
+    }
+  };
+  if(btnLogout) btnLogout.onclick = async ()=>{
+    await CLOUD.auth.signOut();
+  };
+
+  // Auth state
+  CLOUD.auth.onAuthStateChanged(async (user)=>{
+    CLOUD.user = user || null;
+    if(!user){
+      // nicht eingeloggt
+      showAuthGate(true);
+      if(btnLogout) btnLogout.style.display = "none";
+      return;
+    }
+
+    // Rolle (v1): Admin via Whitelist, sonst staff (später sauber aus DB)
+    const email = (user.email||"").toLowerCase();
+    CLOUD.role = CLOUD.adminEmails.map(x=>String(x).toLowerCase()).includes(email) ? "admin" : "staff";
+
+    showAuthGate(false);
+    if(btnLogout) btnLogout.style.display = "inline-block";
+
+    // Erstes Boot lokal (stellt state sicher), danach Remote laden und übernehmen
+    await boot();
+
+    try{
+      const remote = await cloudLoadState();
+      if(remote){
+        // v1: Remote gewinnt, wenn neuer (oder lokal leer)
+        const localStamp = Number(state._cloudUpdatedAt||0);
+        const remoteStamp = Number(remote._cloudUpdatedAt||CLOUD._lastRemoteStamp||0);
+        if(remoteStamp && remoteStamp >= localStamp){
+          state = remote;
+          ensureStateShape();
+          migrateToV2();
+          pruneInvoiceDocs();
+          ensureDefaultDog();
+          saveState();
+          renderDogs();
+          renderDocs();
+          renderInvoiceList();
+        }
+      }
+    }catch(e){
+      console.error("Cloud load failed", e);
+      setAuthMsg("Cloud Sync konnte nicht geladen werden. App läuft lokal weiter.");
+    }
+
+    // Echtzeit-Listener (last-write-wins)
+    cloudStateRef().onSnapshot((snap)=>{
+      if(!snap.exists) return;
+      const data = snap.data();
+      const stamp = Number(data?.updatedAt||0);
+      if(!stamp || stamp <= Number(state._cloudUpdatedAt||0)) return;
+      // Nicht unsere eigene Änderung nochmal einspielen
+      if(CLOUD.user && (data.updatedBy === (CLOUD.user.email||CLOUD.user.uid))) return;
+      if(data.payload){
+        state = data.payload;
+        ensureStateShape();
+        migrateToV2();
+        pruneInvoiceDocs();
+        ensureDefaultDog();
+        saveState();
+        renderDogs();
+        renderDocs();
+        renderInvoiceList();
+      }
+    });
+  });
+}
+
+// Start
+startApp().catch(console.error);
 
 /* ===== B2.2a Freier Rechnungs-Editor ===== */
 function renderInvoiceEditorB2(doc){
