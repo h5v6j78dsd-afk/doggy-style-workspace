@@ -55,6 +55,28 @@
 <div class="hero-sub" id="todayBoardingText">Ruhiger Tag</div>
 </div>
 </div>
+
+<!-- Today -->
+<div class="card">
+  <h2>Heute auf dem Hof</h2>
+  <div class="today-grid">
+    <div class="today-note">
+      <label class="field">
+        <span><strong>Heute wichtig (intern)</strong></span>
+        <textarea id="todayNote" rows="4" placeholder="Kurze interne Notizen für heute…"></textarea>
+      </label>
+      <div class="hint">Hinweis: Diese Notiz gilt nur für heute und wird automatisch täglich getrennt gespeichert.</div>
+    </div>
+    <div class="today-list">
+      <div class="row between" style="margin-bottom:8px;">
+        <div class="muted"><strong>Anwesend / geplant heute</strong></div>
+        <div class="muted" id="todayCount"></div>
+      </div>
+      <div id="todayStaysList" class="today-stays"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Forecast -->
 <div class="card">
 <h2>Auslastung – nächste 14 Tage</h2>

@@ -307,6 +307,19 @@ function formatDateDE(dateStr){
   return d.toLocaleDateString("de-DE");
 }
 
+function applyRoleUI(role){
+  try{
+    document.body.classList.remove('role-admin','role-staff','role-guest');
+    document.body.classList.add(`role-${role}`);
+  }catch(_){}
+  // Default: Admin sees everything. Staff: only Start/Heute.
+  if(role==='staff'){
+    // force home tab
+    try{ selectTab('home'); }catch(_){}
+  }
+}
+
+
 function showPanel(id){
   document.querySelectorAll(".panel").forEach(p=>{
     p.classList.toggle("is-active", p.id === id);
@@ -522,6 +535,8 @@ function ensureStateShape(){
   state.pets = Array.isArray(state.pets) ? state.pets : [];
   state.stays = Array.isArray(state.stays) ? state.stays : [];
   state.invoices = Array.isArray(state.invoices) ? state.invoices : [];
+
+  state.todayNotes = (state.todayNotes && typeof state.todayNotes === 'object') ? state.todayNotes : {};
 
   state._legacy = (state._legacy && typeof state._legacy === "object") ? state._legacy : {};
   state._legacy.dogIdToCustomerId = (state._legacy.dogIdToCustomerId && typeof state._legacy.dogIdToCustomerId === "object") ? state._legacy.dogIdToCustomerId : {};
@@ -1661,6 +1676,146 @@ function renderDocs(){
   if(!docs.length) list.innerHTML=`<div class="muted">Noch keine Aufenthalte erstellt.</div>`;
   renderRecent();
 }
+
+function nowHHMM(){
+  const d=new Date();
+  const hh=String(d.getHours()).padStart(2,'0');
+  const mm=String(d.getMinutes()).padStart(2,'0');
+  return `${hh}:${mm}`;
+}
+
+function getTodayISO(){
+  const d=new Date();
+  const yyyy=d.getFullYear();
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  const dd=String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+let _todayNoteBound=false;
+let _todayNoteTimer=null;
+
+function renderTodayPanel(){
+  const box=document.getElementById('todayStaysList');
+  const noteEl=document.getElementById('todayNote');
+  const countEl=document.getElementById('todayCount');
+  if(!box || !noteEl) return;
+
+  const today=getTodayISO();
+  // bind note once
+  if(!_todayNoteBound){
+    _todayNoteBound=true;
+    noteEl.addEventListener('input', ()=>{
+      const val=noteEl.value||'';
+      clearTimeout(_todayNoteTimer);
+      _todayNoteTimer=setTimeout(()=>{
+        state.todayNotes = state.todayNotes || {};
+        state.todayNotes[today]=val;
+        saveState();
+      }, 250);
+    }, {passive:true});
+  }
+
+  // fill note
+  noteEl.value = (state.todayNotes && state.todayNotes[today]) ? state.todayNotes[today] : '';
+
+  // collect stays that include today
+  const docs=(state.docs||[]).filter(d=>{
+    if(!d || !d.saved) return false;
+    normalizeMeta(d);
+    if(!d.meta.von || !d.meta.bis) return false;
+    const von=d.meta.von, bis=d.meta.bis;
+    return (von<=today && today<=bis);
+  });
+
+  // sort: daycare first, then name
+  docs.sort((a,b)=>{
+    const ab=(a.meta.betreuung||'');
+    const bb=(b.meta.betreuung||'');
+    const aw=ab==='Tagesbetreuung'?0:1;
+    const bw=bb==='Tagesbetreuung'?0:1;
+    if(aw!==bw) return aw-bw;
+    const ap=(getPet(a.dogId)?.name||'').toLowerCase();
+    const bp=(getPet(b.dogId)?.name||'').toLowerCase();
+    return ap.localeCompare(bp,'de');
+  });
+
+  if(countEl){
+    countEl.textContent = `${docs.length} Einträge`;
+  }
+
+  if(!docs.length){
+    box.innerHTML = `<div class="hint">Heute sind (noch) keine Aufenthalte hinterlegt.</div>`;
+    return;
+  }
+
+  const rows = docs.map(doc=>{
+    const pet=getPet(doc.dogId);
+    const cust=getCustomer(doc.customerId);
+    const dogName = pet?.name || 'Hund';
+    const custName = cust?.name || 'Kunde';
+    const bet = doc.meta.betreuung || '';
+    const range = `${formatDateDE(doc.meta.von)} – ${formatDateDE(doc.meta.bis)}`;
+
+    // status for today
+    const outDone = (doc.meta.checkOutDate && doc.meta.checkOutDate <= today);
+    const inDone  = (doc.meta.checkInDate && doc.meta.checkInDate <= today);
+    let badgeCls='warn', badgeTxt='Offen';
+    if(outDone){ badgeCls='off'; badgeTxt = `Abgeholt${doc.meta.checkOutAt?` (${doc.meta.checkOutAt})`:''}`; }
+    else if(inDone){ badgeCls='ok'; badgeTxt = `Da${doc.meta.checkInAt?` (${doc.meta.checkInAt})`:''}`; }
+
+    let actions='';
+    if(!inDone){
+      actions = `<button class="btn primary" onclick="checkInStay('${doc.id}')">Check‑in</button>`;
+    }else if(!outDone){
+      actions = `<button class="btn" onclick="checkOutStay('${doc.id}')">Check‑out</button>`;
+    }else{
+      actions = `<span class="muted">✓ erledigt</span>`;
+    }
+
+    return `
+      <div class="today-stay">
+        <div class="today-stay__left">
+          <div class="today-stay__title">${escapeHtml(dogName)} <span class="muted">· ${escapeHtml(custName)}</span></div>
+          <div class="today-stay__meta">${escapeHtml(bet)} · ${escapeHtml(range)}</div>
+        </div>
+        <div class="row" style="gap:10px; align-items:center;">
+          <span class="badge ${badgeCls}">${badgeTxt}</span>
+          ${actions}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  box.innerHTML = rows;
+}
+
+function checkInStay(docId){
+  const doc=getDoc(docId);
+  if(!doc) return;
+  normalizeMeta(doc);
+  const today=getTodayISO();
+  doc.meta.checkInDate = today;
+  doc.meta.checkInAt = nowHHMM();
+  doc.updatedAt = Date.now();
+  saveState();
+  renderTodayPanel();
+  renderDashboard();
+}
+
+function checkOutStay(docId){
+  const doc=getDoc(docId);
+  if(!doc) return;
+  normalizeMeta(doc);
+  const today=getTodayISO();
+  doc.meta.checkOutDate = today;
+  doc.meta.checkOutAt = nowHHMM();
+  doc.updatedAt = Date.now();
+  saveState();
+  renderTodayPanel();
+  renderDashboard();
+}
+
 function renderRecent(){
   const list=$("#recentList");
   const docs=(state.docs||[]).filter(d=>d.type!=="invoice").slice().sort((a,b)=> (b.updatedAt||"").localeCompare(a.updatedAt||"")).slice(0,3);
@@ -1785,6 +1940,10 @@ function normalizeMeta(doc){
   doc.meta.betreuung = doc.meta.betreuung || "";
   doc.meta.von = doc.meta.von || "";
   doc.meta.bis = doc.meta.bis || "";
+  doc.meta.checkInDate = doc.meta.checkInDate || "";
+  doc.meta.checkInAt = doc.meta.checkInAt || "";
+  doc.meta.checkOutDate = doc.meta.checkOutDate || "";
+  doc.meta.checkOutAt = doc.meta.checkOutAt || "";
 }
 function renderVersions(doc){
   const box = document.getElementById("versionBox");
@@ -2314,6 +2473,7 @@ async function startApp(){
     // Rolle (v1): Admin via Whitelist, sonst staff (später sauber aus DB)
     const email = (user.email||"").toLowerCase();
     CLOUD.role = CLOUD.adminEmails.map(x=>String(x).toLowerCase()).includes(email) ? "admin" : "staff";
+    applyRoleUI(CLOUD.role);
 
     showAuthGate(false);
     if(btnLogout) btnLogout.style.display = "inline-block";
