@@ -17,6 +17,8 @@ const CLOUD = {
   auth: null,
   db: null,
   orgId: (window.firebaseOrgId || "doggystyle"),
+  // Wenn true: bei jedem App-Start Login erzwingen (kein "eingeloggt bleiben")
+  forceLoginAlways: true,
   adminEmails: (window.firebaseAdminEmails || []),
   user: null,
   role: "local",
@@ -46,6 +48,12 @@ async function cloudInit(){
     CLOUD.app = window.firebase.initializeApp(window.firebaseConfig);
     CLOUD.auth = window.firebase.auth();
     CLOUD.db = window.firebase.firestore();
+    // Session nicht dauerhaft speichern (Keychain-Autofill nutzen wir separat)
+    try {
+      if (CLOUD.forceLoginAlways && CLOUD.auth && window.firebase?.auth?.Auth?.Persistence) {
+        await CLOUD.auth.setPersistence(window.firebase.auth.Auth.Persistence.NONE);
+      }
+    } catch(e) { /* ignore */ }
     return true;
   }catch(err){
     console.error("Firebase init failed", err);
@@ -2247,6 +2255,13 @@ async function startApp(){
     await boot();
     return;
   }
+
+  // Option C: immer Login erzwingen (Session bei jedem Start beenden)
+  if(CLOUD.forceLoginAlways){
+    try{ await CLOUD.auth.signOut(); }catch(e){}
+    showAuthGate(true);
+  }
+
 
   // Login UI wiring
   const btnLogin = document.getElementById("btnLogin");
