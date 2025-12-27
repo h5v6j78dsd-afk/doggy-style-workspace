@@ -2,10 +2,24 @@
 *{box-sizing:border-box}html,body{height:100%}
 body{margin:0;font-family:ui-rounded,system-ui,-apple-system,"SF Pro Display","Avenir Next",Arial,sans-serif;color:var(--text);
 background:radial-gradient(900px 600px at 20% 0%, rgba(255,204,102,.18), transparent 60%),radial-gradient(900px 600px at 90% 10%, rgba(120,180,255,.18), transparent 60%),linear-gradient(180deg,#0c0c10 0%,#12131b 100%)}
+/* Topbar */
 .topbar{position:sticky;top:0;z-index:10;padding:14px 14px 10px;background:rgba(12,12,16,.70);backdrop-filter:blur(14px);border-bottom:1px solid rgba(255,255,255,.08);position:relative;}
 
-/* Sync / Account status (oben rechts) */
-.topbar__right{position:absolute; top:14px; right:14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;}
+/* Sync / Account status (oben rechts)
+   Fix: Overlay darf Tabs/Brand nicht "blocken" (pointer-events) und auf kleineren
+   Screens wird der Block in den Flow verschoben.
+*/
+.topbar__right{position:absolute; top:14px; right:14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; pointer-events:none;}
+.topbar__right > *{pointer-events:auto;}
+
+/* Reserve space so brand text doesn't sit under the pills (desktop) */
+.topbar .brand{padding-right:min(360px, 48vw);} 
+
+@media (max-width: 820px){
+  /* On iPad portrait / smaller widths, move status under brand to avoid overlap */
+  .topbar__right{position:static; margin-top:8px; justify-content:flex-start;}
+  .topbar .brand{padding-right:0; margin-bottom:6px;}
+}
 .sync-pill{font-size:12px; font-weight:800; padding:8px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.08); color:var(--text); white-space:nowrap; max-width:72vw; overflow:hidden; text-overflow:ellipsis;}
 .sync-user{font-size:12px; color:var(--muted); font-weight:750; padding:8px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.12); white-space:nowrap; max-width:72vw; overflow:hidden; text-overflow:ellipsis;}
 .sync-box{padding:12px; border-radius:14px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.06); color:var(--text); font-size:13px; line-height:1.4;}
@@ -253,9 +267,10 @@ body.page-login .topbar .brand__sub{ opacity:0.8; }
 .pill.warn{border-color:rgba(255,82,82,.32);background:rgba(255,82,82,.10);color:rgba(255,220,220,.95)}
 
 .cal-month{font-weight:900;letter-spacing:.2px;padding:8px 10px;border-radius:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10)}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+/* Use minmax(0,1fr) so the grid can shrink without forcing horizontal overflow */
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
 .cal-dow{font-size:12px;font-weight:800;opacity:.85;text-align:center;padding:6px 0}
-.cal-cell{position:relative;min-height:86px;padding:10px;border-radius:16px;border:1px solid rgba(255,255,255,.10);background:rgba(18,18,22,.45);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);cursor:pointer;transition:transform .08s ease, border-color .12s ease, background .12s ease}
+.cal-cell{position:relative;min-height:86px;padding:10px;border-radius:16px;border:1px solid rgba(255,255,255,.10);background:rgba(18,18,22,.45);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);cursor:pointer;transition:transform .08s ease, border-color .12s ease, background .12s ease; min-width:0}
 .cal-cell:active{transform:translateY(1px)}
 .cal-cell.is-other{opacity:.45}
 .cal-cell.is-today{border-color:rgba(120,190,255,.45)}
@@ -263,16 +278,27 @@ body.page-login .topbar .brand__sub{ opacity:0.8; }
 .cal-cell.is-over{border-color:rgba(255,82,82,.55);background:rgba(255,82,82,.10)}
 .cal-date{font-weight:900;font-size:14px}
 .cal-badges{margin-top:8px;display:flex;flex-direction:column;gap:6px}
-.cal-badge{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.16);font-size:12px}
+.cal-badge{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.16);font-size:12px; min-width:0}
 .cal-badge strong{font-weight:900}
 .cal-badge .muted{opacity:.8;font-size:12px}
- .cal-free{margin-top:6px;font-size:11px;opacity:.88}
+ .cal-free{margin-top:6px;font-size:11px;opacity:.88; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .cal-bars{margin-top:6px;display:flex;flex-direction:column;gap:5px}
 .cal-bar{height:6px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.10)}
 .cal-bar .fill{height:100%;background:rgba(255,255,255,.35)}
 .pill.toggle{cursor:pointer;user-select:none;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08)}
 .pill.toggle.is-off{opacity:.45;filter:saturate(.6)}
 .cal-warnchip{position:absolute;top:10px;right:10px;font-size:12px;font-weight:900;padding:4px 7px;border-radius:999px;background:rgba(255,82,82,.20);border:1px solid rgba(255,82,82,.40)}
+
+/* iPad / schmale Layouts: kompakter, damit nichts überläuft */
+@media (max-width: 900px){
+  .cal-grid{gap:6px}
+  .cal-cell{padding:8px;border-radius:14px}
+  .cal-date{font-size:13px}
+  .cal-badge{font-size:11px;padding:5px 7px}
+  .cal-badge .muted{font-size:11px}
+  .cal-free{font-size:10px}
+  .cal-warnchip{top:8px;right:8px}
+}
 
 @media (max-width: 520px){
   .cal-cell{min-height:78px;padding:9px}
