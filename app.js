@@ -23,8 +23,69 @@ const CLOUD = {
   user: null,
   role: "local",
   _pushTimer: null,
-  _lastRemoteStamp: 0
+  _lastRemoteStamp: 0,
+  lastPushOkAt: 0,
+  lastPushError: ""
 };
+
+const SYNC = {
+  localSavedAt: 0,
+  cloudLastSeenAt: 0,
+  cloudPending: false,
+  cloudLastOkAt: 0,
+  cloudLastError: ""
+};
+
+function fmtDT(ts){
+  if(!ts) return "—";
+  try{
+    const d = new Date(ts);
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const yy = String(d.getFullYear()).slice(-2);
+    const hh = String(d.getHours()).padStart(2,'0');
+    const mi = String(d.getMinutes()).padStart(2,'0');
+    return `${dd}.${mm}.${yy} ${hh}:${mi}`;
+  }catch(_){ return "—"; }
+}
+
+function updateSyncUI(){
+  const pill = document.getElementById('syncStatus');
+  const userEl = document.getElementById('syncUser');
+  const details = document.getElementById('syncDetails');
+  if(userEl){
+    if(CLOUD.enabled && CLOUD.user){
+      userEl.style.display = 'inline-flex';
+      userEl.textContent = (CLOUD.user.email || 'eingeloggt');
+    } else {
+      userEl.style.display = 'none';
+      userEl.textContent = '';
+    }
+  }
+
+  const localLine = `Lokal gespeichert: ${fmtDT(SYNC.localSavedAt)}`;
+
+  let pillText = 'Offline';
+  let cloudLine = 'Cloud: aus';
+  if(CLOUD.enabled){
+    if(!CLOUD.user){
+      pillText = 'Cloud: Login nötig';
+      cloudLine = 'Cloud: nicht angemeldet';
+    } else if(SYNC.cloudLastError){
+      pillText = 'Cloud: Fehler';
+      cloudLine = `Cloud Fehler: ${SYNC.cloudLastError}`;
+    } else if(SYNC.cloudPending){
+      pillText = 'Cloud: synchronisiert…';
+      cloudLine = `Cloud Sync: läuft (letztes OK ${fmtDT(SYNC.cloudLastOkAt)})`;
+    } else {
+      pillText = `Cloud: OK (${fmtDT(SYNC.cloudLastOkAt)})`;
+      cloudLine = `Cloud zuletzt OK: ${fmtDT(SYNC.cloudLastOkAt)} · Letzter Stand vom Server: ${fmtDT(SYNC.cloudLastSeenAt)}`;
+    }
+  }
+
+  if(pill) pill.textContent = `${pillText} · ${fmtDT(SYNC.localSavedAt)}`;
+  if(details) details.textContent = `${localLine}\n${cloudLine}`;
+}
 
 function cloudIsEnabled(){
   return !!(window.firebaseConfig && window.firebase && window.firebase.initializeApp);
@@ -51,10 +112,9 @@ async function cloudInit(){
       : window.firebase.initializeApp(window.firebaseConfig);
     CLOUD.auth = window.firebase.auth();
     CLOUD.db = window.firebase.firestore();
-    // Session nicht dauerhaft speichern (Login bei jedem Start erzwingen)
+    // iOS/PWA: Persistenz IMMER auf LOCAL setzen (sonst springt man gerne wieder ins Login)
     try {
-      if (CLOUD.forceLoginAlways && CLOUD.auth) {
-        // Firebase compat: LOCAL speichern -> eingeloggt bleiben (iOS stabil)
+      if (CLOUD.auth && CLOUD.auth.setPersistence) {
         await CLOUD.auth.setPersistence(window.firebase.auth.Auth.Persistence.LOCAL);
       }
     } catch(e) { /* ignore */ }
@@ -78,27 +138,47 @@ async function cloudLoadState(){
   const data = snap.data();
   if(!data || !data.payload) return null;
   CLOUD._lastRemoteStamp = Number(data.updatedAt || 0);
+  SYNC.cloudLastSeenAt = CLOUD._lastRemoteStamp;
+  updateSyncUI();
   return data.payload;
 }
 
 function cloudSchedulePush(){
   if(!CLOUD.enabled) return;
   clearTimeout(CLOUD._pushTimer);
+  SYNC.cloudPending = true;
+  updateSyncUI();
   CLOUD._pushTimer = setTimeout(()=>cloudPushNow().catch(console.error), 700);
 }
 
 async function cloudPushNow(){
   if(!CLOUD.enabled) return;
   if(!CLOUD.user) return;
+  SYNC.cloudPending = true;
+  updateSyncUI();
   const stamp = Date.now();
   // Marker im State, damit wir Remote-Updates sauber vergleichen können
   try{ state._cloudUpdatedAt = stamp; }catch(_){/* ignore */}
   // last write wins (v1). Später: echtes Merge pro Objekt.
-  await cloudStateRef().set({
-    payload: state,
-    updatedAt: stamp,
-    updatedBy: CLOUD.user.email || CLOUD.user.uid
-  }, {merge: true});
+  try{
+    await cloudStateRef().set({
+      payload: state,
+      updatedAt: stamp,
+      updatedBy: CLOUD.user.email || CLOUD.user.uid
+    }, {merge: true});
+    CLOUD.lastPushOkAt = stamp;
+    CLOUD.lastPushError = "";
+    SYNC.cloudLastOkAt = stamp;
+    SYNC.cloudLastError = "";
+    SYNC.cloudPending = false;
+  }catch(e){
+    CLOUD.lastPushError = String(e?.message||e||"Cloud write failed");
+    SYNC.cloudLastError = CLOUD.lastPushError;
+    SYNC.cloudPending = false;
+    throw e;
+  }finally{
+    updateSyncUI();
+  }
 }
 
 // ===== PREISLOGIK & STAFFELUNGEN =====
@@ -1553,6 +1633,8 @@ function printInvoice(id){
 function loadState(){try{const raw=localStorage.getItem(LS_KEY);return raw?JSON.parse(raw):{dogs:[],docs:[]};}catch{return {dogs:[],docs:[]};}}
 function saveState(){
   localStorage.setItem(LS_KEY,JSON.stringify(state));
+  SYNC.localSavedAt = Date.now();
+  updateSyncUI();
   // Cloud Sync (Weg 2B): Änderungen nach außen spiegeln
   if(CLOUD.enabled) cloudSchedulePush();
 }
@@ -2329,7 +2411,7 @@ td.k{width:38%;background:#fafafa;font-weight:700}
 </style></head><body>${out}</body></html>`;
 }
 
-$("#btnExportAll").addEventListener("click",()=>{
+function doBackupExport(){
   const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
   const a=document.createElement("a");
   const stamp=new Date().toISOString().slice(0,10);
@@ -2337,7 +2419,46 @@ $("#btnExportAll").addEventListener("click",()=>{
   a.download=`DoggyStyleWorkspace_Backup_${stamp}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
-});
+}
+
+const _btnExportAll = $("#btnExportAll");
+if(_btnExportAll) _btnExportAll.addEventListener("click", doBackupExport);
+
+const _btnBackupExport = document.getElementById('btnBackupExport');
+if(_btnBackupExport) _btnBackupExport.addEventListener('click', doBackupExport);
+
+const _btnBackupImport = document.getElementById('btnBackupImport');
+const _fileBackupImport = document.getElementById('fileBackupImport');
+
+if(_btnBackupImport && _fileBackupImport){
+  _btnBackupImport.addEventListener('click', ()=> _fileBackupImport.click());
+  _fileBackupImport.addEventListener('change', async (ev)=>{
+    const file = ev.target.files && ev.target.files[0];
+    if(!file) return;
+    try{
+      const txt = await file.text();
+      const data = JSON.parse(txt);
+      if(!data || typeof data !== 'object') throw new Error('Ungültiges Backup.');
+      if(!confirm('Backup importieren? Dies überschreibt den aktuellen Stand (lokal + Cloud).')) return;
+      state = data;
+      ensureStateShape();
+      ensureContractDefaults();
+      migrateToV2();
+      pruneInvoiceDocs();
+      ensureDefaultDog();
+      saveState();
+      renderDogs();
+      renderDocs();
+      renderInvoiceList();
+      alert('✅ Backup importiert.');
+    }catch(e){
+      console.error(e);
+      alert('❌ Import fehlgeschlagen: '+(e.message||e));
+    }finally{
+      try{ _fileBackupImport.value = ''; }catch(_){ }
+    }
+  });
+}
 
 $("#btnWipe").addEventListener("click",()=>{
   if(!confirm("Wirklich alle lokalen Daten löschen?")) return;
@@ -2379,6 +2500,7 @@ async function startApp(){
   const btnLogin = document.getElementById("btnLogin");
   const btnRegister = document.getElementById("btnRegister");
   const btnLogout = document.getElementById("btnLogout");
+  const btnLogoutApp = document.getElementById("btnLogoutApp");
   const loginEmail = document.getElementById("loginEmail");
   const loginPass = document.getElementById("loginPass");
 
@@ -2406,12 +2528,17 @@ async function startApp(){
   if(btnLogout) btnLogout.onclick = async ()=>{
     await CLOUD.auth.signOut();
   };
+  if(btnLogoutApp) btnLogoutApp.onclick = async ()=>{
+    try{ await CLOUD.auth.signOut(); }catch(e){}
+  };
 
   // Auth state
   CLOUD.auth.onAuthStateChanged(async (user)=>{
     CLOUD.user = user || null;
     if(!user){
       CLOUD.role = 'guest';
+      try{ if(btnLogoutApp) btnLogoutApp.style.display = 'none'; }catch(e){}
+      updateSyncUI();
       // In dieser Version gibt es kein Login-Overlay mehr. Wenn nicht eingeloggt: auf Login-Seite umleiten.
       try{
         const p = (location && location.pathname) ? location.pathname.toLowerCase() : '';
@@ -2428,6 +2555,14 @@ async function startApp(){
 
     showAuthGate(false);
     if(btnLogout) btnLogout.style.display = "inline-block";
+    if(btnLogoutApp) btnLogoutApp.style.display = "inline-block";
+    updateSyncUI();
+    if(btnLogoutApp) btnLogoutApp.style.display = "inline-block";
+
+    // Sync UI initial
+    SYNC.cloudLastOkAt = Number(CLOUD.lastPushOkAt||0);
+    SYNC.cloudLastError = String(CLOUD.lastPushError||"");
+    updateSyncUI();
 
     // Erstes Boot lokal (stellt state sicher), danach Remote laden und übernehmen
     await boot();
@@ -2461,6 +2596,7 @@ async function startApp(){
       if(!snap.exists) return;
       const data = snap.data();
       const stamp = Number(data?.updatedAt||0);
+      if(stamp) { SYNC.cloudLastSeenAt = stamp; updateSyncUI(); }
       if(!stamp || stamp <= Number(state._cloudUpdatedAt||0)) return;
       // Nicht unsere eigene Änderung nochmal einspielen
       if(CLOUD.user && (data.updatedBy === (CLOUD.user.email||CLOUD.user.uid))) return;
@@ -2509,6 +2645,10 @@ document.addEventListener("visibilitychange", () => {
 
 // Start
 startApp().catch(console.error);
+// UI: Sync-Status regelmäßig auffrischen (auch bei Tab-Wechsel/PWA)
+setInterval(()=>{ try{ updateSyncUI(); }catch(_){ } }, 1500);
+window.addEventListener('online', ()=>{ try{ updateSyncUI(); }catch(_){ } });
+window.addEventListener('offline', ()=>{ try{ updateSyncUI(); }catch(_){ } });
 
 /* ===== B2.2a Freier Rechnungs-Editor ===== */
 function renderInvoiceEditorB2(doc){

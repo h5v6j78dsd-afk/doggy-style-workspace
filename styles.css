@@ -2,7 +2,13 @@
 *{box-sizing:border-box}html,body{height:100%}
 body{margin:0;font-family:ui-rounded,system-ui,-apple-system,"SF Pro Display","Avenir Next",Arial,sans-serif;color:var(--text);
 background:radial-gradient(900px 600px at 20% 0%, rgba(255,204,102,.18), transparent 60%),radial-gradient(900px 600px at 90% 10%, rgba(120,180,255,.18), transparent 60%),linear-gradient(180deg,#0c0c10 0%,#12131b 100%)}
-.topbar{position:sticky;top:0;z-index:10;padding:14px 14px 10px;background:rgba(12,12,16,.70);backdrop-filter:blur(14px);border-bottom:1px solid rgba(255,255,255,.08)}
+.topbar{position:sticky;top:0;z-index:10;padding:14px 14px 10px;background:rgba(12,12,16,.70);backdrop-filter:blur(14px);border-bottom:1px solid rgba(255,255,255,.08);position:relative;}
+
+/* Sync / Account status (oben rechts) */
+.topbar__right{position:absolute; top:14px; right:14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;}
+.sync-pill{font-size:12px; font-weight:800; padding:8px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.08); color:var(--text); white-space:nowrap; max-width:72vw; overflow:hidden; text-overflow:ellipsis;}
+.sync-user{font-size:12px; color:var(--muted); font-weight:750; padding:8px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.12); white-space:nowrap; max-width:72vw; overflow:hidden; text-overflow:ellipsis;}
+.sync-box{padding:12px; border-radius:14px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.06); color:var(--text); font-size:13px; line-height:1.4;}
 .brand{display:flex;gap:12px;align-items:center;margin-bottom:10px}
 .brand__logo{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.10);padding:7px;object-fit:contain;filter:drop-shadow(0 8px 22px rgba(0,0,0,.35));border:1px solid rgba(255,255,255,.10)}
 .brand__title{font-weight:800;font-size:16px}

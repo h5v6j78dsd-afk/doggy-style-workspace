@@ -19,6 +19,12 @@
 <div class="brand__sub">Formularmappe · Offline · iPad‑freundlich</div>
 </div>
 </div>
+
+<!-- Sync/Account Status (klein, oben rechts) -->
+<div class="topbar__right">
+  <div class="sync-pill" id="syncStatus" title="Speicher- & Sync-Status">Offline</div>
+  <div class="sync-user" id="syncUser" title="Aktiver Benutzer" style="display:none"></div>
+</div>
 <nav class="tabs" role="tablist">
 <button class="tab is-active" data-tab="home">Start</button>
 <button class="tab" data-tab="documents">Aufenthalte</button>
@@ -318,9 +324,31 @@
 <section class="panel" id="settings">
 <div class="card">
 <h1>Einstellungen</h1>
-<p>Alles bleibt lokal auf deinem Gerät (Offline‑First).</p>
-<div class="row">
-<button class="btn danger" id="btnWipe">Alle lokalen Daten löschen</button>
+<p>Speichern passiert automatisch – lokal (Offline‑First) und optional zusätzlich in der Cloud (wenn Firebase aktiv ist).</p>
+
+<div class="card" style="margin-top:12px">
+  <h2>Speicher &amp; Backup</h2>
+  <div class="row">
+    <button class="btn" id="btnBackupExport">⬇️ Backup exportieren (JSON)</button>
+    <button class="btn" id="btnBackupImport">⬆️ Backup importieren</button>
+    <input id="fileBackupImport" type="file" accept="application/json" style="display:none"/>
+  </div>
+  <div class="hint" id="backupHint">Tipp: Backup-Dateien am besten in <strong>Dateien</strong> ablegen (z. B. <em>DoggyStyle/Backups</em>).</div>
+</div>
+
+<div class="card" style="margin-top:12px">
+  <h2>Cloud &amp; Konto</h2>
+  <div class="row">
+    <div class="field" style="min-width:260px;flex:2">
+      <span>Status</span>
+      <div class="sync-box" id="syncDetails">—</div>
+    </div>
+    <button class="btn" id="btnLogoutApp" style="display:none">Abmelden</button>
+  </div>
+</div>
+
+<div class="row" style="margin-top:12px">
+  <button class="btn danger" id="btnWipe">Alle lokalen Daten löschen</button>
 </div>
 <div class="hint">
           PDFs archivierst du am besten in <strong>Dateien</strong> in einem Ordner z. B. <em>DoggyStyle/Docs</em>.
@@ -378,13 +406,13 @@
 </footer>
 </div>
 <!-- Firebase (optional) + Config -->
-<script defer="defer" src="firebase-config.js?v=20251227i"></script>
+<script defer="defer" src="firebase-config.js?v=20251227j"></script>
 <script defer="defer" src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script defer="defer" src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script defer="defer" src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
-<script defer="defer" src="app.js?v=20251227i"></script>
+<script defer="defer" src="app.js?v=20251227j"></script>
 <script>
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=20251227d');
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=20251227e');
   </script>
 <!-- Dummy für Legacy-Signatur -->
 <canvas height="1" id="sigPad" style="display:none" width="1"></canvas>
