@@ -28,32 +28,71 @@
 </header>
 <main class="shell">
 <section class="panel is-active" id="home">
-<div class="card">
-<h2>Aktuelle Belegung (nächste 14 Tage)</h2>
-<div id="occupancy"></div>
-</div>
-<div class="card">
-<h2>Heute bei uns</h2>
-<div id="todayStatus"></div>
-</div>
-<div class="card hero">
-<h1>Neuer Aufenthalt</h1>
-<p>Wähle eine Vorlage, fülle aus, unterschreibe – und speichere als PDF über „Drucken“.</p>
-<div class="row">
-<label class="field">
-<span>Vorlage</span>
-<select id="templateSelect"></select>
-</label>
-<button class="btn primary" id="btnNewDoc">Aufenthalt erstellen</button>
-</div>
-<div class="hint">
-<strong>Tipp:</strong> Installiere die App als PWA: In Safari <em>Teilen → Zum Home‑Bildschirm</em>.
+  <section class="dashboard">
+
+    <!-- HERO -->
+    <div class="hero-cards">
+      <div class="hero-card">
+        <div class="hero-header">
+          <span class="hero-icon">🐕</span>
+          <span class="hero-title">Tagesbetreuung</span>
         </div>
-</div>
-<div class="card">
-<h2>Zuletzt</h2>
-<div class="list" id="recentList"></div>
-</div>
+        <div class="hero-value" id="todayDaycareValue">0 / 13</div>
+        <div class="hero-bar"><div class="hero-bar-fill" id="todayDaycareBar"></div></div>
+        <div class="hero-sub" id="todayDaycareText">Ruhiger Tag</div>
+      </div>
+
+      <div class="hero-card">
+        <div class="hero-header">
+          <span class="hero-icon">🏡</span>
+          <span class="hero-title">Urlaubsbetreuung</span>
+        </div>
+        <div class="hero-value" id="todayBoardingValue">0 / 10</div>
+        <div class="hero-bar"><div class="hero-bar-fill" id="todayBoardingBar"></div></div>
+        <div class="hero-sub" id="todayBoardingText">Ruhiger Tag</div>
+      </div>
+    </div>
+
+    <!-- Forecast -->
+    <div class="card">
+      <h2>Auslastung – nächste 14 Tage</h2>
+      <div id="forecastList" class="forecast-list"></div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="card">
+      <h2>Schnellaktionen</h2>
+      <div class="quick-actions">
+        <button class="btn primary" onclick="createStay()">➕ Neuer Aufenthalt</button>
+        <button class="btn" onclick="openDogs()">🐶 Hunde/Kunden</button>
+        <button class="btn" onclick="openInvoices()">🧾 Rechnungen</button>
+        <button class="btn" onclick="selectTab('settings')">⚙️ Einstellungen</button>
+      </div>
+
+      <!-- Hidden legacy controls (kept for compatibility) -->
+      <div class="row" style="display:none">
+        <label class="field">
+          <span>Vorlage</span>
+          <select id="templateSelect"></select>
+        </label>
+        <button class="btn primary" id="btnNewDoc">Aufenthalt erstellen</button>
+      </div>
+
+      <div class="hint">
+        <strong>Tipp:</strong> Installiere die App als PWA: In Safari <em>Teilen → Zum Home‑Bildschirm</em>.
+      </div>
+    </div>
+
+    <!-- Warnings -->
+    <div class="card warning" id="dashboardWarnings" style="display:none"></div>
+
+    <!-- Recent -->
+    <div class="card">
+      <h2>Zuletzt</h2>
+      <div class="list" id="recentList"></div>
+    </div>
+
+  </section>
 </section>
 <section class="panel" id="documents">
 <div class="card">

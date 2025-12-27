@@ -289,7 +289,7 @@ const state=loadState();const COMPANY = {
   paymentTargetDays: 14
 };;if(state.nextInvoiceNumber == null){
   state.nextInvoiceNumber = 1;
-}renderOccupancy();renderTodayStatus();
+}renderDashboard();renderRecent();
 const $=s=>document.querySelector(s);
 const $$=s=>Array.from(document.querySelectorAll(s));
 function formatDateDE(dateStr){
@@ -305,6 +305,146 @@ function showPanel(id){
   if(id === "invoices"){
     renderInvoiceList();
   }
+}
+
+// ==== Dashboard / Schnellaktionen helpers ====
+function selectTab(tabId){
+  // activate tab button
+  $$(".tab").forEach(b=>b.classList.toggle("is-active", b.dataset.tab===tabId));
+  showPanel(tabId);
+}
+
+function createStay(){
+  // Neuer Aufenthalt (Hundeannahme)
+  const sel = document.getElementById("templateSelect");
+  const btn = document.getElementById("btnNewDoc");
+  if(sel){
+    // try to select hundeannahme template
+    const opt = Array.from(sel.options).find(o => (o.value||"").toLowerCase().includes("hundeannahme") || (o.textContent||"").toLowerCase().includes("hundeannahme"));
+    if(opt) sel.value = opt.value;
+  }
+  if(btn) btn.click();
+  else selectTab("documents");
+}
+
+function openDogs(){ selectTab("dogs"); }
+function openCustomers(){ selectTab("dogs"); } // Kunden sind im Hunde/Kunden Bereich
+function openInvoices(){ selectTab("invoices"); }
+
+// ==== Dashboard renderer (Start) ====
+function dashboardStatusText(ratio){
+  if(!isFinite(ratio)) return "Ruhiger Tag";
+  if(ratio < 0.6) return "Ruhiger Tag";
+  if(ratio < 0.9) return "Gut ausgelastet";
+  return "Fast voll";
+}
+function dashboardStatusColor(ratio){
+  if(!isFinite(ratio)) return "#4caf50";
+  if(ratio < 0.7) return "#4caf50";
+  if(ratio < 0.9) return "#ffc107";
+  return "#f44336";
+}
+
+function renderDashboard(){
+  // Dashboard elements exist only on Start screen (home)
+  const elDayVal = document.getElementById("todayDaycareValue");
+  const elBoardVal = document.getElementById("todayBoardingValue");
+  const elForecast = document.getElementById("forecastList");
+  if(!elDayVal || !elBoardVal || !elForecast) return;
+
+  const today = getNextDays(1)[0];
+  const todayDayUsed = countOccupancy("Tagesbetreuung", today, today);
+  const todayBoardUsed = countOccupancy("Urlaubsbetreuung", today, today);
+
+  const dayMax = CAPACITY.Tagesbetreuung;
+  const boardMax = CAPACITY.Urlaubsbetreuung;
+
+  const dayRatio = dayMax ? (todayDayUsed/dayMax) : 0;
+  const boardRatio = boardMax ? (todayBoardUsed/boardMax) : 0;
+
+  elDayVal.textContent = `${todayDayUsed} / ${dayMax}`;
+  elBoardVal.textContent = `${todayBoardUsed} / ${boardMax}`;
+
+  const elDayText = document.getElementById("todayDaycareText");
+  const elBoardText = document.getElementById("todayBoardingText");
+  const elDayBar = document.getElementById("todayDaycareBar");
+  const elBoardBar = document.getElementById("todayBoardingBar");
+
+  if(elDayText) elDayText.textContent = dashboardStatusText(dayRatio);
+  if(elBoardText) elBoardText.textContent = dashboardStatusText(boardRatio);
+
+  if(elDayBar){
+    elDayBar.style.width = `${Math.min(100, Math.max(0, dayRatio*100))}%`;
+    elDayBar.style.background = dashboardStatusColor(dayRatio);
+  }
+  if(elBoardBar){
+    elBoardBar.style.width = `${Math.min(100, Math.max(0, boardRatio*100))}%`;
+    elBoardBar.style.background = dashboardStatusColor(boardRatio);
+  }
+
+  // Forecast next 14 days
+  const days = getNextDays(14);
+  elForecast.innerHTML = "";
+  days.forEach(d=>{
+    const dayUsed = countOccupancy("Tagesbetreuung", d, d);
+    const boardUsed = countOccupancy("Urlaubsbetreuung", d, d);
+    const dayR = dayMax ? (dayUsed/dayMax) : 0;
+    const boardR = boardMax ? (boardUsed/boardMax) : 0;
+
+    const row = document.createElement("div");
+    row.className = "forecast-row";
+    // compact date (dd.mm)
+    const dt = new Date(d);
+    const label = `${String(dt.getDate()).padStart(2,"0")}.${String(dt.getMonth()+1).padStart(2,"0")}`;
+
+    row.innerHTML = `
+      <div class="forecast-date">${label}</div>
+      <div class="forecast-bar">
+        <div class="forecast-icon">🐕</div>
+        <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100,dayR*100)}%;background:${dashboardStatusColor(dayR)}"></div></div>
+        <div class="forecast-count">${dayUsed}/${dayMax}</div>
+      </div>
+      <div class="forecast-bar">
+        <div class="forecast-icon">🏡</div>
+        <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100,boardR*100)}%;background:${dashboardStatusColor(boardR)}"></div></div>
+        <div class="forecast-count">${boardUsed}/${boardMax}</div>
+      </div>
+    `;
+    elForecast.appendChild(row);
+  });
+
+  // Warnings
+  const warnings = [];
+  // capacity warnings for next 14 days
+  days.forEach(d=>{
+    const dayUsed = countOccupancy("Tagesbetreuung", d, d);
+    const boardUsed = countOccupancy("Urlaubsbetreuung", d, d);
+    if(dayMax - dayUsed <= 1){
+      warnings.push(`${formatDateDE(d)}: Tagesbetreuung fast voll (${dayUsed}/${dayMax})`);
+    }
+    if(boardMax - boardUsed <= 1){
+      warnings.push(`${formatDateDE(d)}: Urlaubsbetreuung fast voll (${boardUsed}/${boardMax})`);
+    }
+  });
+  // stays ending today
+  const endingToday = state.docs.filter(doc=>doc.saved && doc.meta?.bis===today).length;
+  if(endingToday>0) warnings.unshift(`${endingToday} Aufenthalt(e) enden heute`);
+
+  const warnBox = document.getElementById("dashboardWarnings");
+  if(warnBox){
+    if(warnings.length){
+      warnBox.style.display = "block";
+      warnBox.innerHTML = `<h3>Hinweise</h3><div class="warning-list">${warnings.slice(0,6).map(w=>`<div>⚠️ ${escapeHtml(w)}</div>`).join("")}</div>`;
+    }else{
+      warnBox.style.display = "none";
+      warnBox.innerHTML = "";
+    }
+  }
+}
+
+function formatDateDE(iso){
+  const dt = new Date(iso);
+  return dt.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"});
 }
 
 $$(".tab").forEach(b=>b.addEventListener("click",()=>{
@@ -1873,7 +2013,7 @@ if(currentDoc.pricing){
 }
      // sauberer Zeitstempel
 
-saveState();renderOccupancy(); renderTodayStatus();                                         // EINMAL speichern
+saveState();renderDashboard(); renderTodayStatus();                                         // EINMAL speichern
 dirty = false;
 
 $("#editorTitle").textContent = currentDoc.title;
