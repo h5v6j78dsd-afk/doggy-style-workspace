@@ -21,12 +21,40 @@ const CLOUD = {
   forceLoginAlways: false,
   adminEmails: (window.firebaseAdminEmails || []),
   user: null,
-  role: "local",
+  role: "local", // local | guest | admin | staff | customer
+  userProfile: null,
   _pushTimer: null,
   _lastRemoteStamp: 0,
   lastPushOkAt: 0,
   lastPushError: ""
 };
+
+const ROLES = {
+  ADMIN: 'admin',
+  STAFF: 'staff',
+  CUSTOMER: 'customer',
+  GUEST: 'guest',
+  LOCAL: 'local'
+};
+
+function isStaff(){
+  return CLOUD.role === ROLES.ADMIN || CLOUD.role === ROLES.STAFF;
+}
+
+function can(action){
+  const r = CLOUD.role;
+  if(r === ROLES.ADMIN){
+    return true;
+  }
+  if(r === ROLES.STAFF){
+    // staff darf arbeiten, aber keine destruktiven/admin-only Aktionen
+    return !['wipe_all','import_backup','manage_users'].includes(action);
+  }
+  if(r === ROLES.CUSTOMER){
+    return ['customer_view','customer_edit','customer_submit'].includes(action);
+  }
+  return false;
+}
 
 const SYNC = {
   localSavedAt: 0,
@@ -131,6 +159,62 @@ function cloudStateRef(){
   return CLOUD.db.collection("orgs").doc(CLOUD.orgId).collection("meta").doc("workspace_state");
 }
 
+function cloudUsersCol(){
+  return CLOUD.db.collection("orgs").doc(CLOUD.orgId).collection("users");
+}
+
+function cloudUserDoc(uid){
+  return cloudUsersCol().doc(uid);
+}
+
+function cloudTasksCol(){
+  return CLOUD.db.collection("orgs").doc(CLOUD.orgId).collection("tasks");
+}
+
+async function loadOrCreateUserProfile(user){
+  if(!CLOUD.enabled || !user) return null;
+  const uid = user.uid;
+  const email = (user.email||"").toLowerCase();
+
+  // Admin-Whitelist hat Vorrang
+  const isAdminEmail = CLOUD.adminEmails.map(x=>String(x).toLowerCase()).includes(email);
+
+  const ref = cloudUserDoc(uid);
+  let snap = null;
+  try{ snap = await ref.get(); }catch(e){ console.warn('User profile read failed', e); }
+
+  if(!snap || !snap.exists){
+    const role = isAdminEmail ? ROLES.ADMIN : ROLES.CUSTOMER;
+    let pendingName = '';
+    try{ pendingName = (localStorage.getItem('ds_pending_name')||'').trim(); }catch(_){ }
+    if(pendingName){ try{ localStorage.removeItem('ds_pending_name'); }catch(_){ } }
+    const displayName = pendingName || ((user.email||'').split('@')[0]||'');
+    const profile = {
+      uid,
+      email: user.email||"",
+      displayName,
+      role,
+      createdAt: Date.now()
+    };
+    try{ await ref.set(profile, {merge:true}); }catch(e){ console.warn('User profile create failed', e); }
+    return profile;
+  }
+
+  const data = snap.data()||{};
+  // falls jemand in Whitelist ist: immer admin
+  if(isAdminEmail && data.role !== ROLES.ADMIN){
+    try{ await ref.set({role: ROLES.ADMIN}, {merge:true}); }catch(_){ }
+    data.role = ROLES.ADMIN;
+  }
+  return {
+    uid,
+    email: data.email || user.email || "",
+    displayName: (data.displayName || ((user.email||'').split('@')[0]||'')),
+    role: data.role || (isAdminEmail ? ROLES.ADMIN : ROLES.CUSTOMER),
+    createdAt: data.createdAt || 0
+  };
+}
+
 async function cloudLoadState(){
   if(!CLOUD.enabled) return null;
   const snap = await cloudStateRef().get();
@@ -145,6 +229,7 @@ async function cloudLoadState(){
 
 function cloudSchedulePush(){
   if(!CLOUD.enabled) return;
+  if(!isStaff()) return; // Kunden dürfen den Workspace-State nicht schreiben
   clearTimeout(CLOUD._pushTimer);
   SYNC.cloudPending = true;
   updateSyncUI();
@@ -154,6 +239,7 @@ function cloudSchedulePush(){
 async function cloudPushNow(){
   if(!CLOUD.enabled) return;
   if(!CLOUD.user) return;
+  if(!isStaff()) return; // Kunden dürfen den Workspace-State nicht schreiben
   SYNC.cloudPending = true;
   updateSyncUI();
   const stamp = Date.now();
@@ -179,6 +265,567 @@ async function cloudPushNow(){
   }finally{
     updateSyncUI();
   }
+}
+
+/* ===== Rollen, Kundenportal & Aufgaben (Weg A) ===== */
+
+function hideStaffUIForCustomer(){
+  // Tabs / Panels umschalten
+  try{
+    const tabs = $$('.tabs .tab');
+    tabs.forEach(btn=>{
+      const t = btn.dataset.tab;
+      if(t === 'customerPortal'){
+        btn.style.display = 'none';
+      } else {
+        btn.style.display = 'none';
+      }
+    });
+    const nav = document.querySelector('nav.tabs');
+    if(nav) nav.style.display = 'none';
+  }catch(_){ }
+  try{
+    // alle Panels verstecken außer customerPortal
+    $$('.panel').forEach(p=>{ p.classList.remove('is-active'); p.style.display = 'none'; });
+    const cp = document.getElementById('customerPortal');
+    if(cp){ cp.style.display = ''; cp.classList.add('is-active'); }
+  }catch(_){ }
+}
+
+function showStaffUI(){
+  try{
+    const nav = document.querySelector('nav.tabs');
+    if(nav) nav.style.display = '';
+    $$('.panel').forEach(p=>{ p.style.display = ''; });
+    const cp = document.getElementById('customerPortal');
+    if(cp){ cp.style.display = 'none'; cp.classList.remove('is-active'); }
+  }catch(_){ }
+  // Inbox nur für staff/admin
+  try{
+    const tabInbox = document.getElementById('tabInbox');
+    if(tabInbox) tabInbox.style.display = isStaff() ? '' : 'none';
+  }catch(_){ }
+
+  // Kalender nur für staff/admin
+  try{
+    const tabCal = document.getElementById('tabCalendar');
+    if(tabCal) tabCal.style.display = isStaff() ? '' : 'none';
+  }catch(_){ }
+}
+
+async function initCustomerPortal(){
+  hideStaffUIForCustomer();
+  updateSyncUI();
+  try{ await loadTemplates(); }catch(_){ }
+  // Logout Button
+  const btn = document.getElementById('btnCustomerLogout');
+  if(btn) btn.onclick = async ()=>{ try{ await CLOUD.auth.signOut(); }catch(_){ } };
+
+  // Live-Listener: offene Aufgaben für diesen Kunden
+  const uid = CLOUD.user?.uid;
+  if(!uid) return;
+
+  const listEl = document.getElementById('customerTaskList');
+  const subtitle = document.getElementById('customerPortalSubtitle');
+  const editor = document.getElementById('customerTaskEditor');
+  if(editor) editor.style.display = 'none';
+
+  // Back
+  const btnBack = document.getElementById('btnCustomerTaskBack');
+  if(btnBack) btnBack.onclick = ()=>{
+    if(editor) editor.style.display = 'none';
+    if(listEl) listEl.style.display = '';
+  };
+
+  const q = cloudTasksCol().where('customerUid','==',uid).where('status','==','open').orderBy('createdAt','desc');
+  q.onSnapshot((snap)=>{
+    const tasks = [];
+    snap.forEach(doc=>{ tasks.push({id: doc.id, ...doc.data()}); });
+    renderCustomerTaskList(tasks);
+    if(subtitle){
+      subtitle.textContent = tasks.length ? 'Doggy Style Hundepension hat Aufgaben für dich.' : 'Aktuell liegen keine Aufgaben für dich vor.';
+    }
+  }, (err)=>{
+    console.error('customer tasks listener', err);
+    if(subtitle) subtitle.textContent = 'Fehler beim Laden der Aufgaben.';
+  });
+
+  function renderCustomerTaskList(tasks){
+    if(!listEl) return;
+    listEl.innerHTML = '';
+    if(!tasks.length){
+      listEl.innerHTML = `<div class="muted">— keine Aufgaben —</div>`;
+      return;
+    }
+    tasks.forEach(t=>{
+      const row = document.createElement('div');
+      row.className = 'list-item';
+      const when = t.createdAt ? fmtDT(t.createdAt) : '';
+      row.innerHTML = `<div><strong>${escapeHtml(t.title||'Aufgabe')}</strong><small>${escapeHtml(t.templateId||'')}${when?(' · '+when):''}</small></div>`;
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      const btnOpen = document.createElement('button');
+      btnOpen.className = 'smallbtn';
+      btnOpen.textContent = 'Öffnen';
+      btnOpen.onclick = ()=>openCustomerTask(t);
+      actions.appendChild(btnOpen);
+      row.appendChild(actions);
+      listEl.appendChild(row);
+    });
+  }
+
+  let _draftTimer = null;
+  async function openCustomerTask(task){
+    if(!task || !task.templateId) return;
+    const t = getTemplate(task.templateId);
+    if(!t){ alert('Vorlage nicht gefunden.'); return; }
+
+    if(listEl) listEl.style.display = 'none';
+    if(editor) editor.style.display = '';
+    const titleEl = document.getElementById('customerTaskTitle');
+    const metaEl = document.getElementById('customerTaskMeta');
+    const root = document.getElementById('customerTaskFormRoot');
+    const hint = document.getElementById('customerTaskSaveHint');
+    if(titleEl) titleEl.textContent = task.title || t.name || 'Aufgabe';
+    if(metaEl) metaEl.textContent = `Formular: ${t.name||task.templateId}`;
+    if(hint) hint.textContent = '';
+
+    const working = {
+      fields: (task.payloadDraft?.fields || task.payloadSubmitted?.fields || {}),
+      meta: (task.payloadDraft?.meta || task.payloadSubmitted?.meta || {})
+    };
+
+    // Render
+    if(root) root.innerHTML = '';
+    const renderFieldSimple = (f, value, bucket)=>{
+      const wrap=document.createElement('label');
+      wrap.className='field'; wrap.style.minWidth='260px';
+      wrap.innerHTML=`<span>${escapeHtml(f.label)}${f.required?" *":""}</span>`;
+      let input;
+      if(f.type==='textarea'){ input=document.createElement('textarea'); input.value=value||''; }
+      else if(f.type==='select'){
+        input=document.createElement('select');
+        input.innerHTML=(f.options||[]).map(o=>`<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
+        input.value=value || (f.options?.[0]||'');
+      }
+      else if(f.type==='checkbox'){ input=document.createElement('input'); input.type='checkbox'; input.checked=!!value; input.style.width='22px'; input.style.height='22px'; }
+      else { input=document.createElement('input'); input.type=f.type||'text'; input.value=value||''; }
+      input.oninput = ()=>{ bucket[f.key] = (f.type==='checkbox')?input.checked:input.value; scheduleDraftSave(); };
+      input.onchange = ()=>{ bucket[f.key] = (f.type==='checkbox')?input.checked:input.value; scheduleDraftSave(); };
+      wrap.appendChild(input);
+      return wrap;
+    };
+
+    const build = ()=>{
+      if(!root) return;
+      root.innerHTML='';
+      t.sections.forEach(sec=>{
+        const card=document.createElement('div');
+        card.className='card';
+        card.innerHTML=`<h2>${escapeHtml(sec.title)}</h2>`;
+        sec.fields.forEach(f=>card.appendChild(renderFieldSimple(f, working.fields[f.key], working.fields)));
+        root.appendChild(card);
+      });
+      const metaCard=document.createElement('div');
+      metaCard.className='card';
+      metaCard.innerHTML=`<h2>Ort / Datum</h2>`;
+      (t.meta||[]).forEach(f=>metaCard.appendChild(renderFieldSimple(f, working.meta[f.key], working.meta)));
+      root.appendChild(metaCard);
+    };
+    build();
+
+    const saveDraftNow = async ()=>{
+      if(!CLOUD.user) return;
+      const payloadDraft = { fields: working.fields, meta: working.meta };
+      try{
+        await cloudTasksCol().doc(task.id).set({
+          payloadDraft,
+          updatedAt: Date.now()
+        }, {merge:true});
+        if(hint) hint.textContent = `✅ Gespeichert: ${fmtDT(Date.now())}`;
+      }catch(e){
+        console.error('draft save', e);
+        if(hint) hint.textContent = '❌ Speichern fehlgeschlagen (bitte später erneut versuchen).';
+      }
+    };
+
+    const scheduleDraftSave = ()=>{
+      clearTimeout(_draftTimer);
+      _draftTimer = setTimeout(()=>saveDraftNow(), 600);
+      if(hint) hint.textContent = '… speichert …';
+    };
+
+    // Submit
+    const btnSubmit = document.getElementById('btnCustomerTaskSubmit');
+    if(btnSubmit) btnSubmit.onclick = async ()=>{
+      if(!confirm('Formular absenden? Danach kann es nicht mehr geändert werden.')) return;
+      try{
+        await cloudTasksCol().doc(task.id).set({
+          payloadSubmitted: { fields: working.fields, meta: working.meta },
+          status: 'submitted',
+          submittedAt: Date.now(),
+          updatedAt: Date.now()
+        }, {merge:true});
+        alert('✅ Danke! Formular wurde übermittelt.');
+        if(editor) editor.style.display = 'none';
+        if(listEl) listEl.style.display = '';
+      }catch(e){
+        console.error('submit', e);
+        alert('❌ Absenden fehlgeschlagen: '+(e.message||e));
+      }
+    };
+  }
+}
+
+async function initStaffFeatures(){
+  showStaffUI();
+  updateSyncUI();
+
+  // Kalender Controls (Monat vor/zurück/heute)
+  try{ wireCalendarControls(); }catch(e){ console.warn(e); }
+
+  // Rechte in UI spiegeln
+  try{
+    const btnWipe = document.getElementById('btnWipe');
+    if(btnWipe) btnWipe.style.display = can('wipe_all') ? '' : 'none';
+    const btnImport = document.getElementById('btnBackupImport');
+    if(btnImport) btnImport.style.display = can('import_backup') ? '' : 'none';
+  }catch(_){ }
+
+  // Admin Cards (Users + Task creation)
+  const adminTaskCard = document.getElementById('adminTaskCard');
+  const adminUserCard = document.getElementById('adminUserCard');
+  if(adminTaskCard) adminTaskCard.style.display = isStaff() ? '' : 'none';
+  if(adminUserCard) adminUserCard.style.display = (CLOUD.role === ROLES.ADMIN) ? '' : 'none';
+
+  // Task creation (staff+admin)
+  try{ await wireTaskCreation(); }catch(e){ console.warn(e); }
+  // User management (admin)
+  try{ if(CLOUD.role === ROLES.ADMIN) await wireUserManagement(); }catch(e){ console.warn(e); }
+  // Inbox
+  try{ await wireInbox(); }catch(e){ console.warn(e); }
+}
+
+async function wireTaskCreation(){
+  const selCustomer = document.getElementById('taskCustomerSelect');
+  const inpCustomerSearch = document.getElementById('taskCustomerSearch');
+  const selTemplate = document.getElementById('taskTemplateSelect');
+  const titleInput = document.getElementById('taskTitleInput');
+  const btnCreate = document.getElementById('btnTaskCreate');
+  const msgEl = document.getElementById('taskCreateMsg');
+  const btnMoreCustomers = document.getElementById('btnCustomersMore');
+  const customerCountEl = document.getElementById('taskCustomerCount');
+  if(!selCustomer || !selTemplate || !btnCreate) return;
+
+  // Templates laden (Vorlagen)
+  try{
+    await loadTemplates();
+    const list = (TEMPLATES||[]);
+    selTemplate.innerHTML = list.map(t=>{
+      const id = t.id || t.templateId || t.name || '';
+      const label = t.name || t.title || id || 'Vorlage';
+      return `<option value="${escapeHtml(id)}">${escapeHtml(label)}</option>`;
+    }).join('');
+  }catch(e){
+    console.warn('templates load', e);
+    selTemplate.innerHTML = '<option value="">(keine Vorlagen)</option>';
+  }
+
+  // Customers (mit Suche + "Mehr laden")
+  let _allCustomers = [];
+  let _custLastDoc = null;
+  let _custHasMore = true;
+  let _custLoading = false;
+  const CUSTOMER_PAGE_SIZE = 200;
+
+  const customerLabel = (u)=>{
+    const dn = String(u.displayName||'').trim();
+    const em = String(u.email||u.uid||'').trim();
+    return dn ? `${dn} – ${em}` : em;
+  };
+
+  const renderCustomers = (q='')=>{
+    const query = (q||'').trim().toLowerCase();
+    const list = query ? _allCustomers.filter(u=>{
+      const dn = String(u.displayName||'').toLowerCase();
+      const em = String(u.email||u.uid||'').toLowerCase();
+      return dn.includes(query) || em.includes(query);
+    }) : _allCustomers;
+
+    if(!list.length){
+      selCustomer.innerHTML = '<option value="">Keine Treffer</option>';
+    } else {
+      selCustomer.innerHTML = list.map(u=>`<option value="${escapeHtml(u.uid)}">${escapeHtml(customerLabel(u))}</option>`).join('');
+    }
+
+    if(customerCountEl) customerCountEl.textContent = `${_allCustomers.length} geladen`;
+    if(btnMoreCustomers) btnMoreCustomers.style.display = _custHasMore ? '' : 'none';
+  };
+
+  const loadCustomersPage = async (reset=false)=>{
+    if(_custLoading) return;
+    _custLoading = true;
+    try{
+      if(reset){
+        _allCustomers = [];
+        _custLastDoc = null;
+        _custHasMore = true;
+      }
+
+      let q = cloudUsersCol()
+        .where('role','==',ROLES.CUSTOMER)
+        .orderBy('createdAt','desc')
+        .limit(CUSTOMER_PAGE_SIZE);
+
+      if(_custLastDoc) q = q.startAfter(_custLastDoc);
+
+      const snap = await q.get();
+      const docs = snap.docs || [];
+      docs.forEach(d=>{
+        const u = d.data()||{};
+        if(!u.uid) u.uid = d.id;
+        _allCustomers.push(u);
+      });
+
+      if(docs.length) _custLastDoc = docs[docs.length-1];
+      _custHasMore = (docs.length === CUSTOMER_PAGE_SIZE);
+
+      renderCustomers(inpCustomerSearch?.value || '');
+    }catch(e){
+      console.warn('customers page', e);
+    }finally{
+      _custLoading = false;
+    }
+  };
+
+  await loadCustomersPage(true);
+
+  if(inpCustomerSearch){
+    inpCustomerSearch.addEventListener('input', ()=>renderCustomers(inpCustomerSearch.value));
+  }
+  if(btnMoreCustomers){
+    btnMoreCustomers.addEventListener('click', (e)=>{ e.preventDefault(); loadCustomersPage(false); });
+  }
+
+  btnCreate.onclick = async ()=>{
+    const customerUid = selCustomer.value;
+    const templateId = selTemplate.value;
+    const tpl = getTemplate(templateId);
+    const title = (titleInput?.value||'').trim()
+      || (tpl?.name ? (tpl.name+' – Ausfüllen') : 'Formular ausfüllen');
+
+    if(!customerUid || !templateId){
+      if(msgEl) msgEl.textContent = 'Bitte Kunde und Vorlage wählen.';
+      return;
+    }
+    if(msgEl) msgEl.textContent = '… erstellt …';
+
+    try{
+      await cloudTasksCol().add({
+        customerUid,
+        templateId,
+        title,
+        status: 'open',
+        createdAt: Date.now(),
+        createdByUid: CLOUD.user?.uid || '',
+        createdByEmail: CLOUD.user?.email || ''
+      });
+      if(msgEl) msgEl.textContent = '✅ Aufgabe freigegeben.';
+      try{ titleInput.value=''; }catch(_){ }
+    }catch(e){
+      console.error(e);
+      if(msgEl) msgEl.textContent = '❌ Fehler: '+(e.message||e);
+    }
+  };
+}
+
+async function wireUserManagement(){
+  const listEl = document.getElementById('usersList');
+  const btnRef = document.getElementById('btnUsersRefresh');
+  const msgEl = document.getElementById('usersMsg');
+  if(!listEl) return;
+
+  const load = async ()=>{
+    if(msgEl) msgEl.textContent = '… lädt …';
+    const snap = await cloudUsersCol().orderBy('createdAt','desc').limit(100).get();
+    const users = [];
+    snap.forEach(d=>users.push({id:d.id, ...d.data()}));
+    listEl.innerHTML = '';
+    users.forEach(u=>{
+      const row = document.createElement('div');
+      row.className = 'list-item';
+      const who = escapeHtml(u.email||u.uid||u.id);
+      const when = u.createdAt ? fmtDT(u.createdAt) : '';
+      row.innerHTML = `<div><strong>${who}</strong><small>${escapeHtml(u.role||'')}${when?(' · '+when):''}</small></div>`;
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      const sel = document.createElement('select');
+      sel.innerHTML = `
+        <option value="admin">admin</option>
+        <option value="staff">staff</option>
+        <option value="customer">customer</option>
+      `;
+      sel.value = u.role || 'customer';
+      sel.onchange = async ()=>{
+        try{
+          await cloudUserDoc(u.uid||u.id).set({role: sel.value}, {merge:true});
+          if(msgEl) msgEl.textContent = '✅ Rolle gespeichert.';
+        }catch(e){
+          console.error(e);
+          if(msgEl) msgEl.textContent = '❌ Fehler: '+(e.message||e);
+        }
+      };
+      actions.appendChild(sel);
+      row.appendChild(actions);
+      listEl.appendChild(row);
+    });
+    if(msgEl) msgEl.textContent = '';
+  };
+
+  if(btnRef) btnRef.onclick = ()=>load().catch(e=>{ console.error(e); if(msgEl) msgEl.textContent='❌ Laden fehlgeschlagen.'; });
+  await load();
+}
+
+async function wireInbox(){
+  const listEl = document.getElementById('inboxList');
+  const btnRef = document.getElementById('btnInboxRefresh');
+  const detail = document.getElementById('inboxDetail');
+  const btnBack = document.getElementById('btnInboxBack');
+  const btnClose = document.getElementById('btnInboxClose');
+  const btnAdopt = document.getElementById('btnInboxAdopt');
+  const titleEl = document.getElementById('inboxDetailTitle');
+  const metaEl = document.getElementById('inboxDetailMeta');
+  const root = document.getElementById('inboxDetailFormRoot');
+  if(!listEl) return;
+
+  let currentTask = null;
+
+  const renderList = (tasks)=>{
+    listEl.innerHTML = '';
+    if(!tasks.length){
+      listEl.innerHTML = `<div class="muted">— keine Eingänge —</div>`;
+      return;
+    }
+    tasks.forEach(t=>{
+      const row = document.createElement('div');
+      row.className = 'list-item';
+      const when = t.submittedAt ? fmtDT(t.submittedAt) : '';
+      row.innerHTML = `<div><strong>${escapeHtml(t.title||'Eingang')}</strong><small>${escapeHtml(t.customerEmail||t.customerUid||'')}${when?(' · '+when):''}</small></div>`;
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      const b = document.createElement('button');
+      b.className='smallbtn';
+      b.textContent='Öffnen';
+      b.onclick = ()=>openDetail(t);
+      actions.appendChild(b);
+      row.appendChild(actions);
+      listEl.appendChild(row);
+    });
+  };
+
+  const loadSubmitted = async ()=>{
+    const snap = await cloudTasksCol().where('status','==','submitted').orderBy('submittedAt','desc').limit(100).get();
+    const tasks = [];
+    snap.forEach(d=>tasks.push({id:d.id, ...d.data()}));
+    // Emails der Kunden auflösen (best effort)
+    const uids = Array.from(new Set(tasks.map(t=>t.customerUid).filter(Boolean)));
+    const map = {};
+    await Promise.all(uids.map(async uid=>{
+      try{
+        const us = await cloudUserDoc(uid).get();
+        if(us.exists) map[uid] = us.data().email || uid;
+      }catch(_){ }
+    }));
+    tasks.forEach(t=>t.customerEmail = map[t.customerUid]||'');
+    renderList(tasks);
+  };
+
+  const openDetail = (task)=>{
+    currentTask = task;
+    if(detail) detail.style.display = '';
+    if(listEl) listEl.style.display = 'none';
+    if(titleEl) titleEl.textContent = task.title || 'Eingang';
+    if(metaEl) metaEl.textContent = `Formular: ${task.templateId||''} · Kunde: ${task.customerEmail||task.customerUid||''} · Abgesendet: ${fmtDT(task.submittedAt||0)}`;
+    if(root) root.innerHTML = '';
+    const t = getTemplate(task.templateId);
+    const payload = task.payloadSubmitted || task.payloadDraft || {fields:{},meta:{}};
+    const fields = payload.fields || {};
+    const meta = payload.meta || {};
+    const renderFieldRO = (label, val)=>{
+      const el = document.createElement('div');
+      el.className='field';
+      el.style.minWidth='260px';
+      el.innerHTML = `<span>${escapeHtml(label)}</span><div class="sync-box" style="padding:10px">${escapeHtml(val==null?'' : String(val))}</div>`;
+      return el;
+    };
+    if(t && root){
+      t.sections.forEach(sec=>{
+        const card=document.createElement('div');
+        card.className='card';
+        card.innerHTML=`<h2>${escapeHtml(sec.title)}</h2>`;
+        sec.fields.forEach(f=>card.appendChild(renderFieldRO(f.label, fields[f.key])));
+        root.appendChild(card);
+      });
+      const metaCard=document.createElement('div');
+      metaCard.className='card';
+      metaCard.innerHTML=`<h2>Ort / Datum</h2>`;
+      (t.meta||[]).forEach(f=>metaCard.appendChild(renderFieldRO(f.label, meta[f.key])));
+      root.appendChild(metaCard);
+    }
+  };
+
+  if(btnBack) btnBack.onclick = ()=>{
+    if(detail) detail.style.display = 'none';
+    if(listEl) listEl.style.display = '';
+  };
+  if(btnClose) btnClose.onclick = async ()=>{
+    if(!currentTask) return;
+    if(!confirm('Eingang schließen? (Status = closed)')) return;
+    await cloudTasksCol().doc(currentTask.id).set({status:'closed', closedAt: Date.now(), updatedAt: Date.now()}, {merge:true});
+    if(detail) detail.style.display='none';
+    if(listEl) listEl.style.display='';
+    await loadSubmitted();
+  };
+  if(btnAdopt) btnAdopt.onclick = async ()=>{
+    if(!currentTask) return;
+    const payload = currentTask.payloadSubmitted || currentTask.payloadDraft;
+    if(!payload){ alert('Kein Inhalt vorhanden.'); return; }
+    const templateId = currentTask.templateId;
+    const t = getTemplate(templateId);
+    if(!t){ alert('Vorlage nicht gefunden.'); return; }
+    // in Workspace als neues Dokument übernehmen
+    const now = new Date().toISOString();
+    const docObj = {
+      id: uid(),
+      templateId,
+      templateName: t.name || templateId,
+      title: currentTask.title || (t.name||'Dokument'),
+      dogId: state.dogs?.[0]?.id || "",
+      petId: "",
+      customerId: "",
+      fields: payload.fields || {},
+      meta: payload.meta || {},
+      signature: null,
+      saved: false,
+      versionOf: null,
+      createdAt: now,
+      updatedAt: now
+    };
+    ensureDocLinks(docObj);
+    state.docs = state.docs || [];
+    state.docs.unshift(docObj);
+    saveState();
+    renderDocs();
+    // Eingang schließen
+    try{ await cloudTasksCol().doc(currentTask.id).set({status:'closed', closedAt: Date.now(), adoptedDocId: docObj.id, updatedAt: Date.now()}, {merge:true}); }catch(_){ }
+    alert('✅ Übernommen. Du findest das Dokument unter Aufenthalte.');
+    if(detail) detail.style.display='none';
+    if(listEl) listEl.style.display='';
+    await loadSubmitted();
+  };
+
+  if(btnRef) btnRef.onclick = ()=>loadSubmitted().catch(console.error);
+  await loadSubmitted();
 }
 
 // ===== PREISLOGIK & STAFFELUNGEN =====
@@ -404,6 +1051,10 @@ function showPanel(id){
   if(id === "workforms"){
     renderWorkformsPanel();
   }
+
+  if(id === "calendar"){
+    renderCalendarPanel();
+  }
 }
 
 // ==== Dashboard / Schnellaktionen helpers ====
@@ -545,6 +1196,224 @@ function renderDashboard(){
 function formatDateDE(iso){
   const dt = new Date(iso);
   return dt.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"});
+}
+
+/* ===== Belegungskalender (Monatsansicht) ===== */
+const CAL = {
+  year: new Date().getFullYear(),
+  month: new Date().getMonth(),
+  selectedDay: "",
+  filters: { urlaub: true, tages: true }
+};
+
+function getCalFilters(){
+  // Safety defaults
+  if(!CAL.filters) CAL.filters = { urlaub:true, tages:true };
+  // Wenn beides aus ist, erzwinge wieder beide an (sonst wirkt Kalender "leer")
+  if(!CAL.filters.urlaub && !CAL.filters.tages){
+    CAL.filters.urlaub = true; CAL.filters.tages = true;
+  }
+  return CAL.filters;
+}
+
+function applyCalFilterUI(){
+  const f = getCalFilters();
+  const btnU = document.getElementById('calFilterUrlaub');
+  const btnT = document.getElementById('calFilterTages');
+  if(btnU){
+    btnU.classList.toggle('is-off', !f.urlaub);
+    btnU.setAttribute('aria-pressed', String(!!f.urlaub));
+    btnU.onclick = ()=>{ CAL.filters.urlaub = !CAL.filters.urlaub; applyCalFilterUI(); renderCalendarPanel(); if(CAL.selectedDay) renderCalendarDayDetail(CAL.selectedDay); };
+  }
+  if(btnT){
+    btnT.classList.toggle('is-off', !f.tages);
+    btnT.setAttribute('aria-pressed', String(!!f.tages));
+    btnT.onclick = ()=>{ CAL.filters.tages = !CAL.filters.tages; applyCalFilterUI(); renderCalendarPanel(); if(CAL.selectedDay) renderCalendarDayDetail(CAL.selectedDay); };
+  }
+}
+
+function clamp(n,min,max){ return Math.max(min, Math.min(max, n)); }
+
+
+function monthLabel(year, month){
+  const d = new Date(year, month, 1);
+  return d.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+}
+
+function dateISO(d){
+  return d.toISOString().slice(0,10);
+}
+
+function startOfCalendarGrid(year, month){
+  // Grid beginnt am Montag der Woche, in der der 1. des Monats liegt
+  const first = new Date(year, month, 1);
+  const weekday = (first.getDay() + 6) % 7; // 0=Mo ... 6=So
+  const start = new Date(first);
+  start.setDate(first.getDate() - weekday);
+  start.setHours(0,0,0,0);
+  return start;
+}
+
+function renderCalendarPanel(){
+  const grid = document.getElementById('calGrid');
+  const title = document.getElementById('calMonthLabel');
+  if(!grid || !title) return;
+
+  title.textContent = monthLabel(CAL.year, CAL.month);
+  applyCalFilterUI();
+
+  // Header (Wochentage)
+  const dows = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+  grid.innerHTML = dows.map(x=>`<div class="cal-dow">${x}</div>`).join('');
+
+  const start = startOfCalendarGrid(CAL.year, CAL.month);
+  const todayIso = new Date().toISOString().slice(0,10);
+
+  for(let i=0;i<42;i++){
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const iso = dateISO(d);
+    const inMonth = (d.getMonth() === CAL.month);
+    const dayNum = d.getDate();
+
+    const board = countForDay('Urlaubsbetreuung', iso);
+    const dayc = countForDay('Tagesbetreuung', iso);
+    const over = (board > CAPACITY.Urlaubsbetreuung) || (dayc > CAPACITY.Tagesbetreuung);
+
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell' + (inMonth ? '' : ' is-other') + (iso===todayIso ? ' is-today':'') + (iso===CAL.selectedDay ? ' is-selected':'') + (over ? ' is-over':'');
+    cell.dataset.day = iso;
+
+    const f = getCalFilters();
+    const freeU = CAPACITY.Urlaubsbetreuung - board;
+    const freeT = CAPACITY.Tagesbetreuung - dayc;
+    const uPct = clamp((board / CAPACITY.Urlaubsbetreuung) * 100, 0, 100);
+    const tPct = clamp((dayc / CAPACITY.Tagesbetreuung) * 100, 0, 100);
+
+    const badges = [];
+    const bars = [];
+    const freeParts = [];
+    if(f.urlaub){
+      badges.push(`<div class="cal-badge" title="Urlaubsbetreuung"><span>🏡 <strong>${board}</strong></span><span class="muted">/ ${CAPACITY.Urlaubsbetreuung}</span></div>`);
+      bars.push(`<div class="cal-bar" title="Urlaub: ${board}/${CAPACITY.Urlaubsbetreuung}"><div class="fill" style="width:${uPct}%;"></div></div>`);
+      freeParts.push(`🏡 ${Math.max(0, freeU)}`);
+    }
+    if(f.tages){
+      badges.push(`<div class="cal-badge" title="Tagesbetreuung"><span>🐕 <strong>${dayc}</strong></span><span class="muted">/ ${CAPACITY.Tagesbetreuung}</span></div>`);
+      bars.push(`<div class="cal-bar" title="Tages: ${dayc}/${CAPACITY.Tagesbetreuung}"><div class="fill" style="width:${tPct}%;"></div></div>`);
+      freeParts.push(`🐕 ${Math.max(0, freeT)}`);
+    }
+
+    cell.innerHTML = `
+      ${over ? `<div class="cal-warnchip" title="Über Kapazität">⚠️</div>` : ``}
+      <div class="cal-date">${dayNum}</div>
+      <div class="cal-badges">${badges.join('')}</div>
+      <div class="cal-free">frei: ${freeParts.join(' · ')}</div>
+      <div class="cal-bars">${bars.join('')}</div>
+    `;
+
+    cell.onclick = ()=>{
+      CAL.selectedDay = iso;
+      renderCalendarPanel();
+      renderCalendarDayDetail(iso);
+    };
+
+    grid.appendChild(cell);
+  }
+}
+
+function renderCalendarDayDetail(iso){
+  const card = document.getElementById('calDayDetail');
+  const title = document.getElementById('calDayTitle');
+  const meta = document.getElementById('calDayMeta');
+  const list = document.getElementById('calDayList');
+  if(!card || !title || !meta || !list) return;
+
+  const dt = new Date(iso);
+  const label = dt.toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
+
+  const board = countForDay('Urlaubsbetreuung', iso);
+  const dayc = countForDay('Tagesbetreuung', iso);
+
+  title.textContent = label;
+  const f = getCalFilters();
+  const freeU = CAPACITY.Urlaubsbetreuung - board;
+  const freeT = CAPACITY.Tagesbetreuung - dayc;
+  const parts = [];
+  const freeParts = [];
+  if(f.urlaub){ parts.push(`🏡 ${board}/${CAPACITY.Urlaubsbetreuung}`); freeParts.push(`🏡 ${Math.max(0, freeU)} frei`); }
+  if(f.tages){ parts.push(`🐕 ${dayc}/${CAPACITY.Tagesbetreuung}`); freeParts.push(`🐕 ${Math.max(0, freeT)} frei`); }
+  meta.textContent = `${parts.join(' · ')}  —  ${freeParts.join(' · ')}`;
+
+  const stays = (state.docs||[]).filter(d=>{
+    if(!d.saved) return false;
+    if(d.type==='invoice') return false;
+    if(!d.meta?.von || !d.meta?.bis) return false;
+    const bt = d.meta?.betreuung||'';
+    if(bt==='Urlaubsbetreuung' && !f.urlaub) return false;
+    if(bt==='Tagesbetreuung' && !f.tages) return false;
+    return (iso >= d.meta.von && iso <= d.meta.bis);
+  }).slice().sort((a,b)=> String(a.meta?.von||'').localeCompare(String(b.meta?.von||'')));
+
+  list.innerHTML = '';
+  if(!stays.length){
+    list.innerHTML = `<div class="muted">Keine Aufenthalte an diesem Tag.</div>`;
+  } else {
+    stays.forEach(d=>{
+      const item = document.createElement('div');
+      item.className = 'item';
+      const t = escapeHtml(d.title||'Aufenthalt');
+      const typ = escapeHtml(d.meta?.betreuung||'');
+      const range = `${escapeHtml(d.meta?.von||'')} – ${escapeHtml(d.meta?.bis||'')}`;
+      item.innerHTML = `<div><strong>${t}</strong><small>${typ} · ${range}</small></div>`;
+
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      const btn = document.createElement('button');
+      btn.className = 'smallbtn';
+      btn.textContent = 'Öffnen';
+      btn.onclick = ()=>openDoc(d.id);
+      actions.appendChild(btn);
+      item.appendChild(actions);
+      list.appendChild(item);
+    });
+  }
+  card.style.display = '';
+}
+
+function wireCalendarControls(){
+  const prev = document.getElementById('btnCalPrev');
+  const next = document.getElementById('btnCalNext');
+  const today = document.getElementById('btnCalToday');
+  const close = document.getElementById('btnCalCloseDay');
+  if(prev) prev.onclick = ()=>{
+    const d = new Date(CAL.year, CAL.month, 1);
+    d.setMonth(d.getMonth()-1);
+    CAL.year = d.getFullYear();
+    CAL.month = d.getMonth();
+    renderCalendarPanel();
+  };
+  if(next) next.onclick = ()=>{
+    const d = new Date(CAL.year, CAL.month, 1);
+    d.setMonth(d.getMonth()+1);
+    CAL.year = d.getFullYear();
+    CAL.month = d.getMonth();
+    renderCalendarPanel();
+  };
+  if(today) today.onclick = ()=>{
+    const d = new Date();
+    CAL.year = d.getFullYear();
+    CAL.month = d.getMonth();
+    CAL.selectedDay = d.toISOString().slice(0,10);
+    renderCalendarPanel();
+    renderCalendarDayDetail(CAL.selectedDay);
+  };
+  if(close) close.onclick = ()=>{
+    const card = document.getElementById('calDayDetail');
+    if(card) card.style.display = 'none';
+    CAL.selectedDay = '';
+    renderCalendarPanel();
+  };
 }
 
 $$(".tab").forEach(b=>b.addEventListener("click",()=>{
@@ -2549,15 +3418,29 @@ async function startApp(){
 
     // Login bei jedem Start erzwingen: wird beim Start durch signOut() erzwungen (kein Auto-Logout nach erfolgreichem Login)
 
-    // Rolle (v1): Admin via Whitelist, sonst staff (später sauber aus DB)
-    const email = (user.email||"").toLowerCase();
-    CLOUD.role = CLOUD.adminEmails.map(x=>String(x).toLowerCase()).includes(email) ? "admin" : "staff";
+    // Rolle (v2): aus Firestore (mit Whitelist-Override)
+    try{
+      CLOUD.userProfile = await loadOrCreateUserProfile(user);
+      CLOUD.role = (CLOUD.userProfile && CLOUD.userProfile.role) ? CLOUD.userProfile.role : ROLES.STAFF;
+    }catch(e){
+      console.warn('Role load failed, fallback to staff', e);
+      CLOUD.role = ROLES.STAFF;
+    }
+
+    // Kunden-Portal: kein Workspace-State, keine Tabs
+    if(CLOUD.role === ROLES.CUSTOMER){
+      try{ await initCustomerPortal(); }catch(e){ console.error(e); }
+      return;
+    }
 
     showAuthGate(false);
     if(btnLogout) btnLogout.style.display = "inline-block";
     if(btnLogoutApp) btnLogoutApp.style.display = "inline-block";
     updateSyncUI();
     if(btnLogoutApp) btnLogoutApp.style.display = "inline-block";
+
+    // staff/admin Features (Rollen, Aufgaben, Inbox)
+    try{ await initStaffFeatures(); }catch(e){ console.warn(e); }
 
     // Sync UI initial
     SYNC.cloudLastOkAt = Number(CLOUD.lastPushOkAt||0);

@@ -24,9 +24,14 @@
     <section class="panel is-active">
       <div class="card" style="max-width:520px;margin:0 auto;">
         <h1 style="margin:0 0 8px 0;">Anmelden</h1>
-        <p class="muted">Für geräteübergreifende Daten bitte anmelden. (Login wird bei jedem Öffnen verlangt.)</p>
+        <p class="muted">Für geräteübergreifende Daten bitte anmelden.</p>
 
         <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:14px">
+          <label class="field" style="min-width:260px; flex:1;">
+            <span>Name (optional)</span>
+            <input id="regName" type="text" autocomplete="name" placeholder="z. B. Anschi Feßler"/>
+          </label>
+
           <label class="field" style="min-width:260px; flex:1;">
             <span>E‑Mail</span>
             <input id="loginEmail" type="email" autocomplete="username" inputmode="email" placeholder="name@domain.de"/>
@@ -48,9 +53,9 @@
     </section>
   </main>
 
-  <script defer src="firebase-config.js?v=20251227i"></script>
+  <script defer src="firebase-config.js?v=20251227k"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-  <script defer src="auth.js?v=20251227i"></script>
+  <script defer src="auth.js?v=20251227k"></script>
 </body>
 </html>

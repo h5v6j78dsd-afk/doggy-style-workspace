@@ -8,7 +8,7 @@
 <link href="manifest.json" rel="manifest"/>
 <meta content="#101014" name="theme-color"/>
 <link href="assets/logo.png" rel="apple-touch-icon"/>
-<link href="styles.css" rel="stylesheet"/>
+<link href="styles.css?v=20251228a" rel="stylesheet"/>
 </head>
 <body class="bg-watermark page-app">
 <header class="topbar">
@@ -27,6 +27,8 @@
 </div>
 <nav class="tabs" role="tablist">
 <button class="tab is-active" data-tab="home">Start</button>
+<button class="tab" data-tab="calendar" id="tabCalendar">Kalender</button>
+<button class="tab" data-tab="inbox" id="tabInbox">Eingänge</button>
 <button class="tab" data-tab="documents">Aufenthalte</button>
 <button class="tab" data-tab="dogs">Hunde/Kunden</button>
 <button class="tab" data-tab="contract">Betreuungsvertrag</button>
@@ -98,6 +100,136 @@
 </div>
 </section>
 </section>
+
+<!-- KALENDER (Monatsansicht) -->
+<section class="panel" id="calendar">
+  <div class="card">
+    <div class="row between" style="gap:10px; flex-wrap:wrap; align-items:center;">
+      <div>
+        <h1 style="margin:0">Belegungskalender</h1>
+        <p class="muted" style="margin:6px 0 0 0">Monatsansicht · Tagesbetreuung &amp; Urlaubsbetreuung · Kapazitätswarnungen</p>
+      </div>
+      <div class="row" style="gap:8px; flex-wrap:wrap; align-items:center;">
+        <button class="btn" id="btnCalPrev">◀</button>
+        <div class="cal-month" id="calMonthLabel">—</div>
+        <button class="btn" id="btnCalNext">▶</button>
+        <button class="btn" id="btnCalToday">Heute</button>
+      </div>
+    </div>
+
+    
+    <div class="row" style="gap:10px; flex-wrap:wrap; margin-top:10px;">
+      <div class="muted" style="font-weight:800;">Filter:</div>
+      <button class="pill toggle" id="calFilterUrlaub" type="button">🏡 Urlaub</button>
+      <button class="pill toggle" id="calFilterTages" type="button">🐕 Tages</button>
+      <div class="muted" id="calFreeHint" style="margin-left:auto;">Freie Plätze werden pro Tag angezeigt.</div>
+    </div>
+<div class="cal-legend" style="margin-top:10px;">
+      <span class="pill">🏡 Urlaubsbetreuung</span>
+      <span class="pill">🐕 Tagesbetreuung</span>
+      <span class="pill warn">⚠️ über Kapazität</span>
+    </div>
+
+    <div class="cal-grid" id="calGrid" style="margin-top:12px;"></div>
+  </div>
+
+  <div class="card" id="calDayDetail" style="display:none;">
+    <div class="row between" style="gap:10px; flex-wrap:wrap;">
+      <div>
+        <h2 id="calDayTitle" style="margin:0">—</h2>
+        <div class="muted" id="calDayMeta" style="margin-top:6px"></div>
+      </div>
+      <div class="row" style="gap:8px; flex-wrap:wrap;">
+        <button class="btn" id="btnCalCloseDay">Schließen</button>
+      </div>
+    </div>
+    <div class="list" id="calDayList" style="margin-top:10px"></div>
+  </div>
+</section>
+
+<!-- CUSTOMER PORTAL (nur für Rolle customer sichtbar) -->
+<section class="panel" id="customerPortal">
+  <div class="card" style="max-width:900px;margin:0 auto;">
+    <div class="row between" style="align-items:flex-start; gap:12px; flex-wrap:wrap;">
+      <div>
+        <h1 style="margin:0">Kundenportal</h1>
+        <p class="muted" id="customerPortalSubtitle" style="margin:6px 0 0 0;">Aktuell liegen keine Aufgaben für dich vor.</p>
+      </div>
+      <button class="btn" id="btnCustomerLogout">Abmelden</button>
+    </div>
+    <div class="hint" style="margin-top:10px">
+      <strong>Hinweis:</strong> Hier siehst du nur Aufgaben/Formulare, die Doggy Style Hundepension für dich freigegeben hat.
+    </div>
+  </div>
+
+  <div class="card" style="max-width:900px;margin:12px auto 0 auto;">
+    <h2>Deine Aufgaben</h2>
+    <div class="list" id="customerTaskList"></div>
+  </div>
+
+  <div class="card" id="customerTaskEditor" style="max-width:900px;margin:12px auto 0 auto; display:none;">
+    <div class="row between" style="gap:10px; flex-wrap:wrap;">
+      <div>
+        <h2 id="customerTaskTitle" style="margin:0">Aufgabe</h2>
+        <div class="muted" id="customerTaskMeta" style="margin-top:6px"></div>
+      </div>
+      <div class="row" style="gap:10px; flex-wrap:wrap;">
+        <button class="btn" id="btnCustomerTaskBack">Zurück</button>
+        <button class="btn primary" id="btnCustomerTaskSubmit">Absenden</button>
+      </div>
+    </div>
+    <div id="customerTaskFormRoot" style="margin-top:12px"></div>
+    <div class="hint" id="customerTaskSaveHint" style="margin-top:10px"></div>
+  </div>
+</section>
+
+<!-- INBOX (Admin/Mitarbeiter) -->
+<section class="panel" id="inbox">
+  <div class="card">
+    <div class="row between" style="flex-wrap:wrap; gap:12px;">
+      <div>
+        <h1 style="margin:0">Eingänge</h1>
+        <p class="muted" style="margin:6px 0 0 0;">Kundenformulare, die eingereicht wurden.</p>
+      </div>
+      <button class="btn" id="btnInboxRefresh">Aktualisieren</button>
+    </div>
+    <div class="list" id="inboxList" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card" id="inboxDetail" style="display:none;">
+    <div class="row between" style="gap:10px; flex-wrap:wrap;">
+      <div>
+        <h2 id="inboxDetailTitle" style="margin:0">Eingang</h2>
+        <div class="muted" id="inboxDetailMeta" style="margin-top:6px"></div>
+      </div>
+      <div class="row" style="gap:10px; flex-wrap:wrap;">
+        <button class="btn" id="btnInboxBack">Zurück</button>
+        <button class="btn" id="btnInboxClose">Schließen</button>
+        <button class="btn primary" id="btnInboxAdopt">In Workspace übernehmen</button>
+      </div>
+    </div>
+    <div id="inboxDetailForm" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card" id="taskAssignCard">
+    <h2>Aufgabe freigeben</h2>
+    <div class="row" style="flex-wrap:wrap; gap:12px;">
+      <label class="field" style="min-width:260px; flex:1;">
+        <span>Kunde auswählen</span>
+        <select id="assignCustomer"></select>
+      </label>
+      <label class="field" style="min-width:260px; flex:1;">
+        <span>Formular/Vorlage</span>
+        <select id="assignTemplate"></select>
+      </label>
+    </div>
+    <div class="row" style="margin-top:12px; gap:10px; flex-wrap:wrap;">
+      <button class="btn primary" id="btnAssignTask">Aufgabe erstellen</button>
+      <div class="muted" id="assignMsg"></div>
+    </div>
+  </div>
+</section>
+
 <section class="panel" id="documents">
 <div class="card">
 <div class="row between">
@@ -326,6 +458,48 @@
 <h1>Einstellungen</h1>
 <p>Speichern passiert automatisch – lokal (Offline‑First) und optional zusätzlich in der Cloud (wenn Firebase aktiv ist).</p>
 
+<div class="card" id="adminTaskCard" style="margin-top:12px; display:none;">
+  <h2>Kundenaufgabe freigeben</h2>
+  <p class="muted" style="margin-top:6px">Erstelle eine Aufgabe für einen registrierten Kunden (z. B. Hundeannahme). Der Kunde sieht danach nur dieses Formular in seinem Kundenportal.</p>
+  <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
+    <label class="field" style="min-width:260px; flex:1;">
+      <span>Kunde suchen</span>
+      <input id="taskCustomerSearch" type="text" placeholder="E-Mail suchen…"/>
+    </label>
+    <label class="field" style="min-width:260px; flex:1;">
+      <span>Kunde auswählen</span>
+      <select id="taskCustomerSelect"></select>
+    </label>
+    <div class="row" style="gap:10px; align-items:flex-end; margin-top:0; flex-wrap:wrap;">
+      <button class="btn" id="btnCustomersMore" type="button">Mehr laden</button>
+      <span class="muted" id="taskCustomerCount"></span>
+    </div>
+
+    <label class="field" style="min-width:260px; flex:1;">
+      <span>Formular/Vorlage</span>
+      <select id="taskTemplateSelect"></select>
+    </label>
+    <label class="field" style="min-width:260px; flex:2;">
+      <span>Titel</span>
+      <input id="taskTitleInput" type="text" placeholder="z. B. Hundeannahme – Erstanmeldung"/>
+    </label>
+  </div>
+  <div class="row" style="gap:10px; margin-top:10px; flex-wrap:wrap;">
+    <button class="btn primary" id="btnTaskCreate">Aufgabe freigeben</button>
+    <span class="muted" id="taskCreateMsg"></span>
+  </div>
+</div>
+
+<div class="card" id="adminUserCard" style="margin-top:12px; display:none;">
+  <h2>Benutzer &amp; Rollen</h2>
+  <p class="muted" style="margin-top:6px">Admin kann Rollen setzen (admin / staff / customer).</p>
+  <div class="row between" style="gap:12px; flex-wrap:wrap; margin-top:10px;">
+    <button class="btn" id="btnUsersRefresh">Aktualisieren</button>
+    <span class="muted" id="usersMsg"></span>
+  </div>
+  <div class="list" id="usersList" style="margin-top:10px"></div>
+</div>
+
 <div class="card" style="margin-top:12px">
   <h2>Speicher &amp; Backup</h2>
   <div class="row">
@@ -406,11 +580,11 @@
 </footer>
 </div>
 <!-- Firebase (optional) + Config -->
-<script defer="defer" src="firebase-config.js?v=20251227j"></script>
+<script defer="defer" src="firebase-config.js?v=20251228a"></script>
 <script defer="defer" src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script defer="defer" src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script defer="defer" src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
-<script defer="defer" src="app.js?v=20251227j"></script>
+<script defer="defer" src="app.js?v=20251228a"></script>
 <script>
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=20251227e');
   </script>
