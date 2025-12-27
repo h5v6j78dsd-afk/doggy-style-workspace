@@ -2278,6 +2278,7 @@ async function startApp(){
     }catch(e){
       console.error(e);
       setAuthMsg(e.message||"Login fehlgeschlagen");
+      try{ alert('Login fehlgeschlagen: '+(e.code||e.message||e)); }catch(_){ }
     }
   };
   if(btnRegister) btnRegister.onclick = async ()=>{
@@ -2288,6 +2289,7 @@ async function startApp(){
     }catch(e){
       console.error(e);
       setAuthMsg(e.message||"Registrierung fehlgeschlagen");
+      try{ alert('Registrierung fehlgeschlagen: '+(e.code||e.message||e)); }catch(_){ }
     }
   };
   if(btnLogout) btnLogout.onclick = async ()=>{
@@ -2297,6 +2299,12 @@ async function startApp(){
   // Auth state
   CLOUD.auth.onAuthStateChanged(async (user)=>{
     CLOUD.user = user || null;
+    if(!user){
+      CLOUD.role = 'guest';
+      showAuthGate(true);
+      if(document.getElementById('btnLogout')) document.getElementById('btnLogout').style.display='none';
+      return;
+    }
 
     // Login bei jedem Start erzwingen: wird beim Start durch signOut() erzwungen (kein Auto-Logout nach erfolgreichem Login)
 
@@ -2373,13 +2381,15 @@ async function startApp(){
       _forcing = false;
     };
 
-    // Wenn die App wieder in den Vordergrund kommt (iPad PWA lädt oft nicht neu)
+        let __wasHidden = document.hidden;
+// Wenn die App wieder in den Vordergrund kommt (iPad PWA lädt oft nicht neu)
     window.addEventListener("pageshow", () => { forceLoginNow(); });
-    window.addEventListener("focus", () => { forceLoginNow(); });
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) forceLoginNow();
+document.addEventListener("visibilitychange", () => {
+      const nowHidden = document.hidden;
+      if (__wasHidden && !nowHidden) forceLoginNow();
+      __wasHidden = nowHidden;
     });
-  }
+}
 
 // Start
 startApp().catch(console.error);
