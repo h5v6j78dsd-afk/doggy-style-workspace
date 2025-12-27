@@ -2298,22 +2298,7 @@ async function startApp(){
   CLOUD.auth.onAuthStateChanged(async (user)=>{
     CLOUD.user = user || null;
 
-    // Login bei jedem Start erzwingen:
-    // Falls Firebase noch einen alten Login aus IndexedDB/LocalStorage wiederherstellt,
-    // melden wir sofort wieder ab, damit immer der Login-Dialog kommt.
-    if (CLOUD.forceLoginAlways && user && !CLOUD._forcedLogoutDone) {
-      CLOUD._forcedLogoutDone = true;
-      try { await CLOUD.auth.signOut(); } catch(e) {}
-      showAuthGate(true);
-      if(btnLogout) btnLogout.style.display = "none";
-      return;
-    }
-    if(!user){
-      // nicht eingeloggt
-      showAuthGate(true);
-      if(btnLogout) btnLogout.style.display = "none";
-      return;
-    }
+    // Login bei jedem Start erzwingen: wird beim Start durch signOut() erzwungen (kein Auto-Logout nach erfolgreichem Login)
 
     // Rolle (v1): Admin via Whitelist, sonst staff (später sauber aus DB)
     const email = (user.email||"").toLowerCase();
