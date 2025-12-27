@@ -18,7 +18,7 @@ const CLOUD = {
   db: null,
   orgId: (window.firebaseOrgId || "doggystyle"),
   // Wenn true: bei jedem App-Start Login erzwingen (kein "eingeloggt bleiben")
-  forceLoginAlways: true,
+  forceLoginAlways: false,
   adminEmails: (window.firebaseAdminEmails || []),
   user: null,
   role: "local",
@@ -45,14 +45,17 @@ async function cloudInit(){
   if(!cloudIsEnabled()) return false;
   try{
     CLOUD.enabled = true;
-    CLOUD.app = window.firebase.initializeApp(window.firebaseConfig);
+    // initializeApp nur einmal (sonst Fehler bei Navigation/Reload)
+    CLOUD.app = (window.firebase.apps && window.firebase.apps.length)
+      ? window.firebase.apps[0]
+      : window.firebase.initializeApp(window.firebaseConfig);
     CLOUD.auth = window.firebase.auth();
     CLOUD.db = window.firebase.firestore();
     // Session nicht dauerhaft speichern (Login bei jedem Start erzwingen)
     try {
       if (CLOUD.forceLoginAlways && CLOUD.auth) {
-        // Firebase compat: NICHT speichern -> kein Auto-Login nach Reload
-        await CLOUD.auth.setPersistence(window.firebase.auth.Auth.Persistence.NONE);
+        // Firebase compat: LOCAL speichern -> eingeloggt bleiben (iOS stabil)
+        await CLOUD.auth.setPersistence(window.firebase.auth.Auth.Persistence.LOCAL);
       }
     } catch(e) { /* ignore */ }
     return true;
