@@ -307,19 +307,6 @@ function formatDateDE(dateStr){
   return d.toLocaleDateString("de-DE");
 }
 
-function applyRoleUI(role){
-  try{
-    document.body.classList.remove('role-admin','role-staff','role-guest');
-    document.body.classList.add(`role-${role}`);
-  }catch(_){}
-  // Default: Admin sees everything. Staff: only Start/Heute.
-  if(role==='staff'){
-    // force home tab
-    try{ selectTab('home'); }catch(_){}
-  }
-}
-
-
 function showPanel(id){
   document.querySelectorAll(".panel").forEach(p=>{
     p.classList.toggle("is-active", p.id === id);
@@ -327,6 +314,12 @@ function showPanel(id){
 
   if(id === "invoices"){
     renderInvoiceList();
+  }
+  if(id === "contract"){
+    renderContractPanel();
+  }
+  if(id === "workforms"){
+    renderWorkformsPanel();
   }
 }
 
@@ -353,6 +346,7 @@ function createStay(){
 function openDogs(){ selectTab("dogs"); }
 function openCustomers(){ selectTab("dogs"); } // Kunden sind im Hunde/Kunden Bereich
 function openInvoices(){ selectTab("invoices"); }
+function openWorkforms(){ selectTab("workforms"); }
 
 // ==== Dashboard renderer (Start) ====
 function dashboardStatusText(ratio){
@@ -534,9 +528,8 @@ function ensureStateShape(){
   state.customers = Array.isArray(state.customers) ? state.customers : [];
   state.pets = Array.isArray(state.pets) ? state.pets : [];
   state.stays = Array.isArray(state.stays) ? state.stays : [];
+  state.worklogs = Array.isArray(state.worklogs) ? state.worklogs : [];
   state.invoices = Array.isArray(state.invoices) ? state.invoices : [];
-
-  state.todayNotes = (state.todayNotes && typeof state.todayNotes === 'object') ? state.todayNotes : {};
 
   state._legacy = (state._legacy && typeof state._legacy === "object") ? state._legacy : {};
   state._legacy.dogIdToCustomerId = (state._legacy.dogIdToCustomerId && typeof state._legacy.dogIdToCustomerId === "object") ? state._legacy.dogIdToCustomerId : {};
@@ -544,11 +537,73 @@ function ensureStateShape(){
   state._legacy.docIdToStayId = (state._legacy.docIdToStayId && typeof state._legacy.docIdToStayId === "object") ? state._legacy.docIdToStayId : {};
   state._legacy.docIdToInvoiceId = (state._legacy.docIdToInvoiceId && typeof state._legacy.docIdToInvoiceId === "object") ? state._legacy.docIdToInvoiceId : {};
 
+  // Vertrag
+  state.contract = (state.contract && typeof state.contract === "object") ? state.contract : null;
+  state.contractSignatures = Array.isArray(state.contractSignatures) ? state.contractSignatures : [];
+
   // Rechnungsnummer beibehalten
   if(typeof state.nextInvoiceNumber !== "number"){
     state.nextInvoiceNumber = 1;
   }
 }
+
+
+function ensureContractDefaults(){
+  if(!state.contract || typeof state.contract !== "object"){
+    state.contract = {
+      title: "Betreuungsvertrag für Hunde",
+      provider: "Doggy Style Hundepension",
+      version: "v1.0",
+      validFrom: "2025-12-27",
+      text: DEFAULT_CONTRACT_TEXT,
+      updatedAt: new Date().toISOString()
+    };
+  }
+  if(!Array.isArray(state.contractSignatures)) state.contractSignatures = [];
+}
+
+// Vertragstext (v1.0) – App-geeignet (ohne Beträge)
+const DEFAULT_CONTRACT_TEXT = `
+<h4>1. Vertragsgegenstand</h4>
+<p>Der Betreiber übernimmt die zeitweise Betreuung des vom Hundehalter angegebenen Hundes im Rahmen einer Tages- oder Urlaubsbetreuung. Die Betreuung erfolgt nach bestem Wissen und Gewissen sowie unter Beachtung des Tierschutzes und der betrieblichen Abläufe.</p>
+
+<h4>2. Pflichten des Hundehalters</h4>
+<ul>
+  <li>Der Hund ist gesund; es liegen keine ansteckenden Krankheiten vor.</li>
+  <li>Der Impfstatus ist altersgerecht und aktuell.</li>
+  <li>Bekannte Verhaltensauffälligkeiten, gesundheitliche Besonderheiten oder Medikamentengaben wurden vollständig und wahrheitsgemäß angegeben.</li>
+  <li>Der Hund ist haftpflichtversichert.</li>
+</ul>
+<p>Falschangaben können zum sofortigen Abbruch der Betreuung führen.</p>
+
+<h4>3. Gesundheitszustand &amp; Verantwortung</h4>
+<p>Der Betreiber ist berechtigt, den Hund bei Auffälligkeiten von der Betreuung auszuschließen oder den Halter zur Abholung aufzufordern. Der Betreiber entscheidet im Sinne des Tierschutzes und der Sicherheit aller Hunde.</p>
+
+<h4>4. Haftung &amp; Haftungsausschluss</h4>
+<p>Die Betreuung erfolgt auf eigenes Risiko des Hundehalters. Der Betreiber haftet nicht für Verletzungen oder Erkrankungen, die durch typisches Hundeverhalten (z. B. Rangordnung, Spiel, Stress) entstehen, für Schäden durch andere betreute Hunde sowie für Verlust/Beschädigung persönlicher Gegenstände. Eine Haftung besteht nur bei Vorsatz oder grober Fahrlässigkeit.</p>
+
+<h4>5. Läufige Hündinnen</h4>
+<p><strong>5.1 Grundsatz:</strong> Läufige Hündinnen werden grundsätzlich nicht betreut.</p>
+<p><strong>5.2 Beginn während des Aufenthalts:</strong> Beginnt eine Hündin während des Aufenthalts läufig zu werden, ist der Hundehalter verpflichtet, die Hündin unverzüglich abzuholen, oder der Betreiber entscheidet im Einzelfall über das weitere Vorgehen.</p>
+<p><strong>5.3 Einzelfallentscheidung:</strong> In Ausnahmefällen kann die Betreuung nach ausdrücklicher Einzelfallentscheidung des Betreibers fortgeführt werden. Dabei kann zusätzlicher Betreuungsaufwand entstehen, ein Aufpreis erhoben werden oder der Aufenthalt vorzeitig beendet werden. Ein Anspruch des Hundehalters auf Fortführung besteht nicht.</p>
+<p><strong>5.4 Haftung:</strong> Der Betreiber übernimmt keine Haftung für Stress-/Verhaltensreaktionen anderer Hunde oder betriebsbedingte Einschränkungen im Zusammenhang mit der Läufigkeit.</p>
+<p><strong>5.5 Falschangaben:</strong> Wird Läufigkeit verschwiegen oder falsch angegeben, behält sich der Betreiber vor, den Aufenthalt sofort abzubrechen, zusätzliche Kosten geltend zu machen und zukünftige Betreuungen abzulehnen.</p>
+
+<h4>6. Tierarzt &amp; Notfall</h4>
+<p>Der Betreiber ist berechtigt, bei akuten gesundheitlichen Problemen einen Tierarzt aufzusuchen. Die entstehenden Kosten trägt der Hundehalter. Der Betreiber bemüht sich, den Hundehalter vorab zu informieren, sofern dies möglich ist.</p>
+
+<h4>7. Ausschluss von der Betreuung</h4>
+<p>Der Betreiber kann die Betreuung jederzeit beenden, wenn eine Gefahr für andere Hunde oder Menschen besteht, der Hund erheblich gestresst ist, falsche Angaben gemacht wurden oder betriebliche/tierschutzrechtliche Gründe dies erfordern.</p>
+
+<h4>8. Datenschutz</h4>
+<p>Personen- und tierbezogene Daten werden ausschließlich zur Vertragsabwicklung und gemäß den geltenden Datenschutzbestimmungen verarbeitet. Es gilt die Datenschutzerklärung des Betreibers.</p>
+
+<h4>9. Schlussbestimmungen</h4>
+<p>Änderungen oder Ergänzungen dieses Vertrags bedürfen der Textform. Sollte eine Bestimmung unwirksam sein, bleibt die Wirksamkeit der übrigen Regelungen unberührt.</p>
+
+<h4>10. Digitale Zustimmung</h4>
+<p>Mit der digitalen Unterschrift bestätigt der Hundehalter, den Vertrag vollständig gelesen zu haben, den Inhalt zu akzeptieren und die Angaben wahrheitsgemäß gemacht zu haben. Ort/Datum wird automatisch erfasst.</p>
+`;
 
 function migrateToV2(){
   // Migration ist bewusst "additiv": wir verlieren NICHTS aus state.dogs/state.docs,
@@ -556,6 +611,7 @@ function migrateToV2(){
   if(state.schemaVersion >= 2) return;
 
   ensureStateShape();
+  ensureContractDefaults();
 
   const dogIdToCustomerId = {};
   const dogIdToPetId = {};
@@ -691,7 +747,8 @@ function pruneInvoiceDocs(){
   if(!Array.isArray(state.docs)) state.docs = [];
   const invDocs = state.docs.filter(d=>d && d.type==="invoice");
   if(invDocs.length){
-    state.invoices = Array.isArray(state.invoices) ? state.invoices : [];
+    state.worklogs = Array.isArray(state.worklogs) ? state.worklogs : [];
+  state.invoices = Array.isArray(state.invoices) ? state.invoices : [];
     invDocs.forEach(inv=>{
       if(!state.invoices.some(x=>x.id===inv.id)){
         state.invoices.push(inv);
@@ -768,6 +825,7 @@ function fillCpEditorForPet(pet){
 
 function openCpEditor(mode, petId){
   ensureStateShape();
+  ensureContractDefaults();
   cpEdit.mode = mode || "new";
   cpEdit.petId = petId || "";
 
@@ -854,16 +912,19 @@ function upsertLegacyDogForPet(pet, customer){
 // ===== ETAPPE 3 Helpers: Hund auswählen -> Halter automatisch =====
 function getPetByDogId(dogId){
   ensureStateShape();
+  ensureContractDefaults();
   const pid = state._legacy?.dogIdToPetId?.[dogId] || "";
   return pid ? getPet(pid) : null;
 }
 function getCustomerByDogId(dogId){
   ensureStateShape();
+  ensureContractDefaults();
   const cid = state._legacy?.dogIdToCustomerId?.[dogId] || "";
   return cid ? getCustomer(cid) : null;
 }
 function getLegacyDogIdForPet(petId){
   ensureStateShape();
+  ensureContractDefaults();
   const map = state._legacy?.dogIdToPetId || {};
   for(const did of Object.keys(map)){
     if(map[did] === petId) return did;
@@ -873,10 +934,24 @@ function getLegacyDogIdForPet(petId){
 function ensureDocLinks(doc){
   if(!doc) return;
   ensureStateShape();
+  ensureContractDefaults();
   // Falls noch alte docs ohne petId/customerId existieren: aus dogId ableiten
   if(!doc.petId && doc.dogId) doc.petId = state._legacy?.dogIdToPetId?.[doc.dogId] || "";
   if(!doc.customerId && doc.dogId) doc.customerId = state._legacy?.dogIdToCustomerId?.[doc.dogId] || "";
 }
+function updateDocCustomerPetFromDogId(doc){
+  if(!doc || !doc.dogId) return;
+  // Immer konsistent halten: dogId -> (customerId, petId)
+  const dogId = doc.dogId;
+  const pet = getPetByDogId(dogId);
+  const cust = getCustomerByDogId(dogId);
+  if(pet) doc.petId = pet.id;
+  if(cust) doc.customerId = cust.id;
+  // Fallback auf legacy mapping
+  if(!doc.petId) doc.petId = state._legacy?.dogIdToPetId?.[dogId] || doc.petId || "";
+  if(!doc.customerId) doc.customerId = state._legacy?.dogIdToCustomerId?.[dogId] || doc.customerId || "";
+}
+
 function renderCustomerInfoForDogId(dogId){
   const box = document.getElementById("customerInfo");
   if(!box) return;
@@ -1067,16 +1142,19 @@ function renderOccupancy(){
 }
 function getInvoices(){
   ensureStateShape();
+  ensureContractDefaults();
   return (state.invoices||[]).slice().sort((a,b)=> (b.updatedAt||"").localeCompare(a.updatedAt||""));
 }
 
 function getInvoiceById(id){
   ensureStateShape();
+  ensureContractDefaults();
   return (state.invoices||[]).find(x=>x.id===id) || null;
 }
 
 function resolveInvoiceParties(inv){
   ensureStateShape();
+  ensureContractDefaults();
   const cust = inv?.customerId ? getCustomer(inv.customerId) : (inv?.dogId ? getCustomerByDogId(inv.dogId) : null);
   const pet  = inv?.petId ? getPet(inv.petId) : (inv?.dogId ? getPetByDogId(inv.dogId) : null);
   const legacyDog = inv?.dogId ? (state.dogs||[]).find(d=>d.id===inv.dogId) : null;
@@ -1203,6 +1281,7 @@ function setInvoiceStatus(id, status){
 // ===== ETAPPE 4: Freie Rechnung (Kunde/Hund auswählen statt tippen) =====
 function openFreeInvoiceForm(){
   ensureStateShape();
+  ensureContractDefaults();
   const view = document.getElementById("invoiceView");
   if(!view) return;
 
@@ -1270,6 +1349,7 @@ function openFreeInvoiceForm(){
 
 function renderFreeInvoicePetOptions(){
   ensureStateShape();
+  ensureContractDefaults();
   const customerId = document.getElementById("freeInvCustomer")?.value || "";
   const petSel = document.getElementById("freeInvPet");
   if(!petSel) return;
@@ -1282,6 +1362,7 @@ function renderFreeInvoicePetOptions(){
 
 function ensureLegacyDogForPetId(petId, customerId){
   ensureStateShape();
+  ensureContractDefaults();
   if(!petId || !customerId) return "";
 
   const map = state._legacy?.dogIdToPetId || {};
@@ -1309,6 +1390,7 @@ function ensureLegacyDogForPetId(petId, customerId){
 
 function createFreeInvoice(){
   ensureStateShape();
+  ensureContractDefaults();
   const customerId = document.getElementById("freeInvCustomer")?.value || "";
   const petId = document.getElementById("freeInvPet")?.value || "";
   const from = document.getElementById("freeInvFrom")?.value || "";
@@ -1352,6 +1434,7 @@ function createFreeInvoice(){
     updatedAt: new Date().toISOString()
   };
 
+  state.worklogs = Array.isArray(state.worklogs) ? state.worklogs : [];
   state.invoices = Array.isArray(state.invoices) ? state.invoices : [];
   state.invoices.push(invoice);
 
@@ -1486,6 +1569,7 @@ function syncDogSelect(){
 function renderDogs(){
   // Etappe 2: primär pets/customers anzeigen, fallback auf legacy dogs
   ensureStateShape();
+  ensureContractDefaults();
   const list = $("#dogList");
   if(!list) return;
   list.innerHTML = "";
@@ -1498,7 +1582,8 @@ function renderDogs(){
       const el = document.createElement("div");
       el.className = "item";
       const chipTxt = p.chip ? (` · Chip: ${escapeHtml(p.chipNumber||"ja")}`) : "";
-      el.innerHTML = `<div><strong>${escapeHtml(p.name||"Hund")}</strong><small>${escapeHtml(c?.name||"")} · ${escapeHtml(c?.phone||"")}${chipTxt}</small></div>
+      const badge = contractBadge(p.customerId, p.id);
+      el.innerHTML = `<div><strong>${escapeHtml(p.name||"Hund")}</strong><small>${escapeHtml(c?.name||"")} · ${escapeHtml(c?.phone||"")}${chipTxt}${badge}</small></div>
         <div class="actions"><button class="smallbtn" data-e="1">Bearbeiten</button><button class="smallbtn" data-d="1">Löschen</button></div>`;
       el.querySelector('[data-e="1"]').onclick = ()=>openCpEditor("edit", p.id);
       el.querySelector('[data-d="1"]').onclick = ()=>{
@@ -1547,6 +1632,7 @@ $("#btnCpCancel").addEventListener("click",()=>closeCpEditor());
 
 $("#btnCpSave").addEventListener("click",()=>{
   ensureStateShape();
+  ensureContractDefaults();
 
   const mode = cpEdit.mode;
   const useExisting = $("#useExistingCustomer").checked && (state.customers||[]).length>0;
@@ -1676,146 +1762,6 @@ function renderDocs(){
   if(!docs.length) list.innerHTML=`<div class="muted">Noch keine Aufenthalte erstellt.</div>`;
   renderRecent();
 }
-
-function nowHHMM(){
-  const d=new Date();
-  const hh=String(d.getHours()).padStart(2,'0');
-  const mm=String(d.getMinutes()).padStart(2,'0');
-  return `${hh}:${mm}`;
-}
-
-function getTodayISO(){
-  const d=new Date();
-  const yyyy=d.getFullYear();
-  const mm=String(d.getMonth()+1).padStart(2,'0');
-  const dd=String(d.getDate()).padStart(2,'0');
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-let _todayNoteBound=false;
-let _todayNoteTimer=null;
-
-function renderTodayPanel(){
-  const box=document.getElementById('todayStaysList');
-  const noteEl=document.getElementById('todayNote');
-  const countEl=document.getElementById('todayCount');
-  if(!box || !noteEl) return;
-
-  const today=getTodayISO();
-  // bind note once
-  if(!_todayNoteBound){
-    _todayNoteBound=true;
-    noteEl.addEventListener('input', ()=>{
-      const val=noteEl.value||'';
-      clearTimeout(_todayNoteTimer);
-      _todayNoteTimer=setTimeout(()=>{
-        state.todayNotes = state.todayNotes || {};
-        state.todayNotes[today]=val;
-        saveState();
-      }, 250);
-    }, {passive:true});
-  }
-
-  // fill note
-  noteEl.value = (state.todayNotes && state.todayNotes[today]) ? state.todayNotes[today] : '';
-
-  // collect stays that include today
-  const docs=(state.docs||[]).filter(d=>{
-    if(!d || !d.saved) return false;
-    normalizeMeta(d);
-    if(!d.meta.von || !d.meta.bis) return false;
-    const von=d.meta.von, bis=d.meta.bis;
-    return (von<=today && today<=bis);
-  });
-
-  // sort: daycare first, then name
-  docs.sort((a,b)=>{
-    const ab=(a.meta.betreuung||'');
-    const bb=(b.meta.betreuung||'');
-    const aw=ab==='Tagesbetreuung'?0:1;
-    const bw=bb==='Tagesbetreuung'?0:1;
-    if(aw!==bw) return aw-bw;
-    const ap=(getPet(a.dogId)?.name||'').toLowerCase();
-    const bp=(getPet(b.dogId)?.name||'').toLowerCase();
-    return ap.localeCompare(bp,'de');
-  });
-
-  if(countEl){
-    countEl.textContent = `${docs.length} Einträge`;
-  }
-
-  if(!docs.length){
-    box.innerHTML = `<div class="hint">Heute sind (noch) keine Aufenthalte hinterlegt.</div>`;
-    return;
-  }
-
-  const rows = docs.map(doc=>{
-    const pet=getPet(doc.dogId);
-    const cust=getCustomer(doc.customerId);
-    const dogName = pet?.name || 'Hund';
-    const custName = cust?.name || 'Kunde';
-    const bet = doc.meta.betreuung || '';
-    const range = `${formatDateDE(doc.meta.von)} – ${formatDateDE(doc.meta.bis)}`;
-
-    // status for today
-    const outDone = (doc.meta.checkOutDate && doc.meta.checkOutDate <= today);
-    const inDone  = (doc.meta.checkInDate && doc.meta.checkInDate <= today);
-    let badgeCls='warn', badgeTxt='Offen';
-    if(outDone){ badgeCls='off'; badgeTxt = `Abgeholt${doc.meta.checkOutAt?` (${doc.meta.checkOutAt})`:''}`; }
-    else if(inDone){ badgeCls='ok'; badgeTxt = `Da${doc.meta.checkInAt?` (${doc.meta.checkInAt})`:''}`; }
-
-    let actions='';
-    if(!inDone){
-      actions = `<button class="btn primary" onclick="checkInStay('${doc.id}')">Check‑in</button>`;
-    }else if(!outDone){
-      actions = `<button class="btn" onclick="checkOutStay('${doc.id}')">Check‑out</button>`;
-    }else{
-      actions = `<span class="muted">✓ erledigt</span>`;
-    }
-
-    return `
-      <div class="today-stay">
-        <div class="today-stay__left">
-          <div class="today-stay__title">${escapeHtml(dogName)} <span class="muted">· ${escapeHtml(custName)}</span></div>
-          <div class="today-stay__meta">${escapeHtml(bet)} · ${escapeHtml(range)}</div>
-        </div>
-        <div class="row" style="gap:10px; align-items:center;">
-          <span class="badge ${badgeCls}">${badgeTxt}</span>
-          ${actions}
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  box.innerHTML = rows;
-}
-
-function checkInStay(docId){
-  const doc=getDoc(docId);
-  if(!doc) return;
-  normalizeMeta(doc);
-  const today=getTodayISO();
-  doc.meta.checkInDate = today;
-  doc.meta.checkInAt = nowHHMM();
-  doc.updatedAt = Date.now();
-  saveState();
-  renderTodayPanel();
-  renderDashboard();
-}
-
-function checkOutStay(docId){
-  const doc=getDoc(docId);
-  if(!doc) return;
-  normalizeMeta(doc);
-  const today=getTodayISO();
-  doc.meta.checkOutDate = today;
-  doc.meta.checkOutAt = nowHHMM();
-  doc.updatedAt = Date.now();
-  saveState();
-  renderTodayPanel();
-  renderDashboard();
-}
-
 function renderRecent(){
   const list=$("#recentList");
   const docs=(state.docs||[]).filter(d=>d.type!=="invoice").slice().sort((a,b)=> (b.updatedAt||"").localeCompare(a.updatedAt||"")).slice(0,3);
@@ -1908,6 +1854,7 @@ function createDoc(tid){
   const t=getTemplate(tid);
   if(!t) return;
   ensureStateShape();
+  ensureContractDefaults();
   // Etappe 3: Standardauswahl = erster Hund aus neuem Stamm (falls vorhanden)
   let defaultDogId = state.dogs?.[0]?.id || "";
   if((state.pets||[]).length){
@@ -1940,10 +1887,6 @@ function normalizeMeta(doc){
   doc.meta.betreuung = doc.meta.betreuung || "";
   doc.meta.von = doc.meta.von || "";
   doc.meta.bis = doc.meta.bis || "";
-  doc.meta.checkInDate = doc.meta.checkInDate || "";
-  doc.meta.checkInAt = doc.meta.checkInAt || "";
-  doc.meta.checkOutDate = doc.meta.checkOutDate || "";
-  doc.meta.checkOutAt = doc.meta.checkOutAt || "";
 }
 function renderVersions(doc){
   const box = document.getElementById("versionBox");
@@ -1976,6 +1919,7 @@ updateCreateInvoiceButton();
   currentDoc=(state.docs||[]).find(d=>d.id===id);
   if(!currentDoc) return;
   ensureDocLinks(currentDoc);
+  updateDocCustomerPetFromDogId(currentDoc);
 normalizeMeta(currentDoc);
   $("#editorTitle").textContent=currentDoc.title||"Dokument";
   $("#editorMeta").textContent=currentDoc.templateName;
@@ -1984,6 +1928,7 @@ normalizeMeta(currentDoc);
   $("#dogSelect").value=currentDoc.dogId||state.dogs?.[0]?.id||"";
   renderCustomerInfoForDogId($("#dogSelect").value);
   renderEditor(currentDoc);
+  updateContractWarnBanner(currentDoc);
   autofillHundeannahmeFieldsFromMaster($("#dogSelect").value, { overwrite:false });
 renderVersions(currentDoc);
   
@@ -2083,7 +2028,9 @@ $("#dogSelect").addEventListener("change", () => {
   // Etappe 3: Halter-/Hund-Info anzeigen + doc verknüpfen
   currentDoc.dogId = $("#dogSelect").value;
   ensureDocLinks(currentDoc);
+  updateDocCustomerPetFromDogId(currentDoc);
   renderCustomerInfoForDogId(currentDoc.dogId);
+  updateContractWarnBanner(currentDoc);
   autofillHundeannahmeFieldsFromMaster(currentDoc.dogId, { overwrite:false });
   dirty = true;
 });
@@ -2225,6 +2172,7 @@ function createInvoiceFromDoc(doc){
     updatedAt: new Date().toISOString()
   };
 
+  state.worklogs = Array.isArray(state.worklogs) ? state.worklogs : [];
   state.invoices = Array.isArray(state.invoices) ? state.invoices : [];
   state.invoices.push(invoice);
   state.nextInvoiceNumber++;
@@ -2397,6 +2345,7 @@ $("#btnWipe").addEventListener("click",()=>{
 async function boot(){
   await loadTemplates();
   ensureStateShape();
+  ensureContractDefaults();
   migrateToV2();
   pruneInvoiceDocs();
   ensureDefaultDog();
@@ -2473,7 +2422,6 @@ async function startApp(){
     // Rolle (v1): Admin via Whitelist, sonst staff (später sauber aus DB)
     const email = (user.email||"").toLowerCase();
     CLOUD.role = CLOUD.adminEmails.map(x=>String(x).toLowerCase()).includes(email) ? "admin" : "staff";
-    applyRoleUI(CLOUD.role);
 
     showAuthGate(false);
     if(btnLogout) btnLogout.style.display = "inline-block";
@@ -2490,6 +2438,7 @@ async function startApp(){
         if(remoteStamp && remoteStamp >= localStamp){
           state = remote;
           ensureStateShape();
+  ensureContractDefaults();
           migrateToV2();
           pruneInvoiceDocs();
           ensureDefaultDog();
@@ -2515,6 +2464,7 @@ async function startApp(){
       if(data.payload){
         state = data.payload;
         ensureStateShape();
+  ensureContractDefaults();
         migrateToV2();
         pruneInvoiceDocs();
         ensureDefaultDog();
@@ -2794,3 +2744,932 @@ function formatEuroFromCent(cent){
   const v = Number(cent||0) / 100;
   return v.toFixed(2).replace(".", ",") + " €";
 }
+
+
+// ===== Contract (Etappe 7B) =====
+function getContractSignature(customerId, petId){
+  const v = state.contract?.version || "";
+  return (state.contractSignatures||[]).find(s=>s.customerId===customerId && s.petId===petId && s.contractVersion===v) || null;
+}
+function hasValidContract(customerId, petId){
+  return !!getContractSignature(customerId, petId);
+}
+function contractBadge(customerId, petId){
+  if(!customerId || !petId) return "";
+  return hasValidContract(customerId, petId) ? " · Vertrag: 🟢" : " · Vertrag: 🔴";
+}
+
+function updateContractWarnBanner(doc){
+  const box = document.getElementById("contractWarnBanner");
+  if(!box) return;
+
+  // Standard: aus
+  box.style.display = "none";
+  box.innerHTML = "";
+
+  if(!doc) return;
+
+  // nur bei Aufenthalten (hundeannahme)
+  const isStay = (doc.templateId === "hundeannahme" || doc.templateName === "Hundeannahme" || doc.type === "stay");
+  if(!isStay) return;
+
+  const customerId = doc.customerId || "";
+  const petId = doc.petId || "";
+  if(!customerId || !petId) return;
+
+  const valid = hasValidContract(customerId, petId);
+
+  box.style.display = "flex";
+  box.innerHTML = valid ? `
+    <div>✅ <strong>Betreuungsvertrag gültig.</strong> Du kannst den Vertrag jederzeit als PDF speichern.</div>
+    <div class="btnrow">
+      <button class="btn" type="button" id="btnPdfContract">📄 PDF</button>
+      <button class="btn ghost" type="button" id="btnGoContract">Vertrag ansehen</button>
+    </div>
+  ` : `
+    <div>⚠️ <strong>Betreuungsvertrag fehlt oder ist veraltet.</strong> Bitte vor Beginn unterschreiben lassen.</div>
+    <div class="btnrow">
+      <button class="btn" type="button" id="btnGoContract">Zum Vertrag</button>
+      <button class="btn ghost" type="button" id="btnPdfContract" disabled title="PDF erst nach gültiger Unterschrift verfügbar">📄 PDF</button>
+    </div>
+  `;
+
+  const go = document.getElementById("btnGoContract");
+  if(go){
+    go.onclick = ()=>{ selectTab("contract"); window.scrollTo({top:0,behavior:"smooth"}); };
+  }
+
+  const pdf = document.getElementById("btnPdfContract");
+  if(pdf && valid){
+    pdf.onclick = ()=>{ openContractPdfWindow(customerId, petId); };
+  }
+}
+
+
+function openContractPdfWindow(customerId, petId){
+  ensureContractDefaults();
+  const c = state.contract;
+  const sig = getContractSignature(customerId, petId);
+  if(!c || !sig){ alert("Für diese Auswahl liegt keine gültige Unterschrift vor."); return; }
+  const customer = getCustomer(customerId) || {};
+  const pet = getPet(petId) || {};
+  const signedAt = new Date(sig.signedAt || new Date().toISOString()).toLocaleString("de-DE");
+
+  const html = `<!doctype html>
+  <html lang="de"><head><meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(c.title||"Betreuungsvertrag")} – PDF</title>
+  <style>
+    body{font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif; margin:24px; color:#111;}
+    .head{display:flex; align-items:center; gap:14px; margin-bottom:14px;}
+    .logo{width:64px; height:64px; object-fit:contain;}
+    .meta{color:#444; font-size:13px;}
+    .doc{margin-top:14px; line-height:1.45;}
+    h1{font-size:18px; margin:0;}
+    h2{font-size:15px; margin:18px 0 8px;}
+    .sig{margin-top:22px; padding-top:12px; border-top:1px solid #ddd;}
+    .sigrow{display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap;}
+    .sigimg{width:320px; max-width:100%; border:1px solid #ddd; border-radius:10px; padding:6px;}
+    .small{font-size:12px; color:#444;}
+    @media print{ body{margin:10mm;} }
+  </style>
+  </head><body>
+    <div class="head">
+      <img class="logo" src="assets/logo.png" alt="Doggy Style"/>
+      <div>
+        <h1>${escapeHtml(c.title||"Betreuungsvertrag")}</h1>
+        <div class="meta">${escapeHtml(c.provider||"Doggy Style Hundepension")} · Version ${escapeHtml(c.version||"v1.0")} · Gültig ab ${escapeHtml(formatDateDE(c.validFrom||"2025-12-27"))}</div>
+        <div class="meta">Kunde: ${escapeHtml((customer.name||"")+" "+(customer.lastName||"")).trim() || escapeHtml(customer.email||"")} · Hund: ${escapeHtml(pet.name||"")}</div>
+        <div class="meta">Adresse: ${escapeHtml(formatCustomerAddress(customer) || "—")}</div>
+      </div>
+    </div>
+
+    <div class="doc">${c.text || DEFAULT_CONTRACT_TEXT}</div>
+
+    <div class="sig">
+      <h2>Digitale Unterschrift</h2>
+      <div class="sigrow">
+        <div>
+          <div class="small">Unterschrieben am: <strong>${escapeHtml(signedAt)}</strong></div>
+          <div class="small">Vertragsversion: <strong>${escapeHtml(sig.contractVersion)}</strong></div>
+        </div>
+        <img class="sigimg" src="${sig.signatureDataUrl}" alt="Unterschrift"/>
+      </div>
+      <p class="small">Hinweis: Speichern als PDF über „Drucken“ (Teilen → Drucken / als PDF sichern) je nach Gerät.</p>
+    </div>
+
+    <script>
+      // Auto-open print dialog for easy Save as PDF
+      setTimeout(()=>{ try{ window.print(); }catch(e){} }, 350);
+    </script>
+  </body></html>`;
+
+  const win = window.open("", "_blank");
+  if(!win){ alert("Popup blockiert. Bitte Popups erlauben."); return; }
+  win.document.open(); win.document.write(html); win.document.close();
+  win.focus();
+}
+
+function renderContractPanel(){
+  ensureContractDefaults();
+  const t = $("#contractText");
+  const titleEl = $("#contractTitle");
+  const metaEl = $("#contractMeta");
+  if(!t) return;
+
+  const c = state.contract;
+  titleEl.textContent = c.title || "Betreuungsvertrag";
+  metaEl.textContent = `${c.provider || "Doggy Style Hundepension"} · Version ${c.version} · Gültig ab ${formatDateDE(c.validFrom||"2025-12-27")}`;
+  t.innerHTML = c.text || DEFAULT_CONTRACT_TEXT;
+
+  // Admin box
+  const isAdmin = (CLOUD.role === "admin");
+  const adminBox = $("#contractAdminBox");
+  if(adminBox) adminBox.style.display = isAdmin ? "block" : "none";
+  if(isAdmin){
+    const edit = $("#contractEditText");
+    if(edit && !edit.value) edit.value = c.text || DEFAULT_CONTRACT_TEXT;
+    const btnReset = $("#contractResetEdit");
+    if(btnReset) btnReset.onclick = ()=>{ if(edit) edit.value = c.text || DEFAULT_CONTRACT_TEXT; };
+    const btnPub = $("#contractPublish");
+    if(btnPub) btnPub.onclick = ()=>{
+      if(!edit) return;
+      const newText = String(edit.value||"").trim();
+      if(newText.length < 200){ alert("Bitte einen vollständigen Vertragstext einfügen."); return; }
+      // bump minor version: v1.0 -> v1.1
+      const m = String(c.version||"v1.0").match(/^v(\d+)\.(\d+)$/);
+      let major=1, minor=0;
+      if(m){ major=parseInt(m[1],10); minor=parseInt(m[2],10); }
+      minor += 1;
+      c.version = `v${major}.${minor}`;
+      c.text = newText;
+      c.updatedAt = new Date().toISOString();
+      state.contract = c;
+      saveState();
+      alert(`Neue Version veröffentlicht: ${c.version}. Kunden müssen neu unterschreiben.`);
+      renderContractPanel();
+    };
+  }
+
+  // customer/pet selects
+  const cs = $("#contractCustomerSelect");
+  const ps = $("#contractPetSelect");
+  const customers = (state.customers||[]).slice().sort((a,b)=>String(a.lastName||"").localeCompare(String(b.lastName||""),"de"));
+  cs.innerHTML = customers.map(x=>`<option value="${x.id}">${escapeHtml((x.lastName? x.lastName+', ':'') + (x.firstName||''))}</option>`).join("") || `<option value="">(keine Kunden)</option>`;
+
+  function fillPets(){
+    const cid = cs.value;
+    const pets = (state.pets||[]).filter(p=>p.customerId===cid).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"de"));
+    ps.innerHTML = pets.map(p=>`<option value="${p.id}">${escapeHtml(p.name||"Hund")}</option>`).join("") || `<option value="">(keine Hunde)</option>`;
+    updateSignedInfo();
+  }
+
+  cs.onchange = fillPets;
+  fillPets();
+
+  // signature pad
+  initContractSignaturePad();
+  $("#contractSigClear").onclick = ()=>{ clearContractSig(); };
+  const pdfBtn = document.getElementById("contractPdfBtn");
+  if(pdfBtn){
+    pdfBtn.onclick = ()=>{
+      const customerId = cs.value;
+      const petId = ps.value;
+      if(!customerId || !petId){ alert("Bitte Kunde und Hund auswählen."); return; }
+      const s = getContractSignature(customerId, petId);
+      if(!s){ alert("Für diese Auswahl liegt noch keine gültige Unterschrift vor."); return; }
+      openContractPdfWindow(customerId, petId);
+    };
+  }
+
+  $("#contractSignBtn").onclick = ()=>{
+    const customerId = cs.value;
+    const petId = ps.value;
+    if(!customerId || !petId){ alert("Bitte Kunde und Hund auswählen."); return; }
+    const chk = $("#contractAcceptChk");
+    if(!chk.checked){ alert("Bitte zuerst bestätigen, dass du den Vertrag gelesen und akzeptiert hast."); return; }
+    const dataUrl = getContractSigData();
+    if(!dataUrl){ alert("Bitte unterschreiben (Unterschriftsfeld)."); return; }
+
+    // Save signature
+    const sig = {
+      id: uid(),
+      customerId, petId,
+      contractVersion: state.contract.version,
+      signedAt: new Date().toISOString(),
+      signatureDataUrl: dataUrl
+    };
+
+    // Replace existing for this combo/version
+    state.contractSignatures = (state.contractSignatures||[]).filter(s=>!(s.customerId===customerId && s.petId===petId && s.contractVersion===sig.contractVersion));
+    state.contractSignatures.push(sig);
+    saveState();
+    clearContractSig();
+    chk.checked = false;
+    updateSignedInfo();
+    $("#contractStatusBanner").textContent = "✅ Vertrag gespeichert.";
+    setTimeout(()=>{ const b=$("#contractStatusBanner"); if(b) b.textContent=""; }, 1500);
+    // refresh lists where badges appear
+    renderDogs();
+  };
+
+  function updateSignedInfo(){
+    const customerId = cs.value;
+    const petId = ps.value;
+    const info = $("#contractSignedInfo");
+    const s = getContractSignature(customerId, petId);
+    if(!info) return;
+    if(s){
+      info.innerHTML = `🟢 Gültig unterschrieben am ${new Date(s.signedAt).toLocaleString("de-DE")} (Version ${escapeHtml(s.contractVersion)})`;
+    }else{
+      info.innerHTML = `🔴 Noch keine gültige Unterschrift für Version ${escapeHtml(state.contract.version)}.`;
+    }
+  }
+}
+
+// --- Signature Pad (inline) ---
+let _contractSig = {canvas:null, ctx:null, drawing:false, hasInk:false, last:null};
+
+function initContractSignaturePad(){
+  const canvas = document.getElementById("contractSig");
+  if(!canvas) return;
+  if(_contractSig.canvas === canvas) return;
+  _contractSig.canvas = canvas;
+  _contractSig.ctx = canvas.getContext("2d");
+  clearContractSig();
+
+  const getPos = (e)=>{
+    const rect = canvas.getBoundingClientRect();
+    const pt = (e.touches && e.touches[0]) ? e.touches[0] : e;
+    return {x:(pt.clientX-rect.left)*(canvas.width/rect.width), y:(pt.clientY-rect.top)*(canvas.height/rect.height)};
+  };
+
+  const start = (e)=>{
+    e.preventDefault();
+    _contractSig.drawing=true;
+    _contractSig.last=getPos(e);
+  };
+  const move = (e)=>{
+    if(!_contractSig.drawing) return;
+    e.preventDefault();
+    const p=getPos(e);
+    const ctx=_contractSig.ctx;
+    ctx.strokeStyle="rgba(255,255,255,0.92)";
+    ctx.lineWidth=3;
+    ctx.lineCap="round";
+    ctx.beginPath();
+    ctx.moveTo(_contractSig.last.x,_contractSig.last.y);
+    ctx.lineTo(p.x,p.y);
+    ctx.stroke();
+    _contractSig.last=p;
+    _contractSig.hasInk=true;
+  };
+  const end = (e)=>{
+    if(!_contractSig.drawing) return;
+    e.preventDefault();
+    _contractSig.drawing=false;
+  };
+
+  canvas.addEventListener("pointerdown", start, {passive:false});
+  canvas.addEventListener("pointermove", move, {passive:false});
+  canvas.addEventListener("pointerup", end, {passive:false});
+  canvas.addEventListener("pointercancel", end, {passive:false});
+  canvas.addEventListener("touchstart", start, {passive:false});
+  canvas.addEventListener("touchmove", move, {passive:false});
+  canvas.addEventListener("touchend", end, {passive:false});
+}
+
+function clearContractSig(){
+  if(!_contractSig.canvas || !_contractSig.ctx) return;
+  const c=_contractSig.canvas, ctx=_contractSig.ctx;
+  ctx.clearRect(0,0,c.width,c.height);
+  // subtle grid
+  ctx.fillStyle="rgba(0,0,0,0.18)";
+  ctx.fillRect(0,0,c.width,c.height);
+  ctx.strokeStyle="rgba(255,255,255,0.10)";
+  ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(20, c.height-28);
+  ctx.lineTo(c.width-20, c.height-28);
+  ctx.stroke();
+  _contractSig.hasInk=false;
+}
+
+function getContractSigData(){
+  if(!_contractSig.canvas || !_contractSig.hasInk) return null;
+  return _contractSig.canvas.toDataURL("image/png");
+}
+
+// ==== Arbeitsblätter (Etappe 9) ====
+let _wfSig = { canvas:null, ctx:null, isDown:false, hasInk:false };
+
+function wfTodayKey(){
+  return formatYMD(new Date());
+}
+function wfUserLabel(){
+  const u = (CLOUD.user && CLOUD.user.email) ? CLOUD.user.email : "unbekannt";
+  return u;
+}
+function wfNewId(){ return "wf_"+uid(); }
+
+function initWfSignaturePad(canvas, clearBtn){
+  _wfSig.canvas = canvas;
+  _wfSig.ctx = canvas.getContext("2d");
+  _wfSig.isDown = false;
+  _wfSig.hasInk = false;
+
+  function resize(){
+    const rect = canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+    canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(ratio,0,0,ratio,0,0);
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "rgba(255,255,255,.92)";
+    ctx.fillStyle = "rgba(0,0,0,0)";
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  function pos(e){
+    const r = canvas.getBoundingClientRect();
+    if(e.touches && e.touches[0]){
+      return {x: e.touches[0].clientX - r.left, y: e.touches[0].clientY - r.top};
+    }
+    return {x: e.clientX - r.left, y: e.clientY - r.top};
+  }
+  function start(e){
+    e.preventDefault();
+    _wfSig.isDown = true;
+    const p = pos(e);
+    _wfSig.ctx.beginPath();
+    _wfSig.ctx.moveTo(p.x, p.y);
+  }
+  function move(e){
+    if(!_wfSig.isDown) return;
+    e.preventDefault();
+    const p = pos(e);
+    _wfSig.ctx.lineTo(p.x, p.y);
+    _wfSig.ctx.stroke();
+    _wfSig.hasInk = true;
+  }
+  function end(e){
+    if(!_wfSig.isDown) return;
+    e.preventDefault();
+    _wfSig.isDown = false;
+  }
+
+  canvas.addEventListener("mousedown", start);
+  canvas.addEventListener("mousemove", move);
+  window.addEventListener("mouseup", end);
+
+  canvas.addEventListener("touchstart", start, {passive:false});
+  canvas.addEventListener("touchmove", move, {passive:false});
+  window.addEventListener("touchend", end, {passive:false});
+
+  if(clearBtn){
+    clearBtn.addEventListener("click", ()=>{
+      const r = canvas.getBoundingClientRect();
+      _wfSig.ctx.clearRect(0,0,r.width,r.height);
+      _wfSig.hasInk = false;
+    });
+  }
+}
+function wfSigDataUrl(){
+  if(!_wfSig.canvas || !_wfSig.hasInk) return null;
+  return _wfSig.canvas.toDataURL("image/png");
+}
+
+function wfArchiveAdd(entry){
+  state.worklogs.unshift(entry);
+  cloudSchedulePush();
+}
+
+function wfOpenPdf(html){
+  const w = window.open("", "_blank");
+  if(!w) { alert("Popup blockiert – bitte Popups erlauben."); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>{ try{ w.focus(); w.print(); }catch(_){} }, 300);
+}
+
+function wfPdfTemplate(title, bodyHtml){
+  const css = `
+    <style>
+      @page{ size:A4; margin:16mm; }
+      body{ font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif; color:#111; }
+      h1{ font-size:18px; margin:0 0 8px; }
+      .meta{ font-size:12px; color:#333; margin-bottom:10px; }
+      .box{ border:1px solid #bbb; padding:10px; border-radius:10px; margin:10px 0; }
+      .grid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+      .k{ font-size:12px; color:#444; }
+      .v{ font-size:13px; font-weight:600; }
+      .sig img{ width: 220px; height:auto; border:1px solid #999; border-radius:8px; background:#fff; }
+      .muted{ color:#666; font-size:12px; }
+      table{ width:100%; border-collapse:collapse; }
+      td,th{ border:1px solid #ccc; padding:6px; font-size:12px; text-align:left; }
+    </style>
+  `;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>${css}</head><body>${bodyHtml}</body></html>`;
+}
+
+function renderWorkformsPanel(){
+  const host = document.getElementById("workformsView");
+  if(!host) return;
+
+  // bind buttons once
+  const b1 = document.getElementById("wfBtnHygiene");
+  const b2 = document.getElementById("wfBtnShift");
+  const b3 = document.getElementById("wfBtnIncident");
+  const b4 = document.getElementById("wfBtnArchive");
+  const b5 = document.getElementById("wfBtnTodayPrint");
+
+  if(b1 && !b1._bound){ b1._bound=true; b1.addEventListener("click", ()=>wfShowHygiene()); }
+  if(b2 && !b2._bound){ b2._bound=true; b2.addEventListener("click", ()=>wfShowShift()); }
+  if(b3 && !b3._bound){ b3._bound=true; b3.addEventListener("click", ()=>wfShowIncident()); }
+  if(b4 && !b4._bound){ b4._bound=true; b4.addEventListener("click", ()=>wfShowArchive()); }
+  if(b5 && !b5._bound){ b5._bound=true; b5.addEventListener("click", ()=>wfTodayPrint()); }
+
+  // default view
+  if(!host.dataset.view){
+    wfShowArchive(true);
+  }
+}
+
+function wfShowHygiene(){
+  const host = document.getElementById("workformsView");
+  host.dataset.view="hygiene";
+  const today = wfTodayKey();
+  host.innerHTML = `
+    <div class="wf-form">
+      <h3>Hygiene-Nachweis (${today})</h3>
+      <div class="muted">Täglich · Unterschrift Pflicht · Abschluss = Archivierung</div>
+      <div class="wf-row" style="margin-top:10px">
+        <label class="field"><input type="checkbox" id="wfHygClean"> Reinigung durchgeführt</label>
+        <label class="field"><input type="checkbox" id="wfHygDis"> Desinfektion durchgeführt</label>
+        <label class="field"><input type="checkbox" id="wfHygSep"> Trennung eingehalten</label>
+      </div>
+      <div style="margin-top:10px">
+        <label class="field" style="display:block">
+          Besonderheiten / Abweichungen (optional)
+          <textarea id="wfHygNotes" rows="3" style="width:100%"></textarea>
+        </label>
+      </div>
+      <div style="margin-top:10px">
+        <div class="muted">Unterschrift</div>
+        <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">
+          <canvas id="wfSigCanvas" style="width:320px;max-width:100%;height:120px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.18)"></canvas>
+          <button class="btn" id="wfSigClear" type="button">Löschen</button>
+        </div>
+      </div>
+      <div class="wf-actions">
+        <button class="btn primary" id="wfHygClose" type="button">Abschließen & bestätigen</button>
+        <button class="btn" id="wfHygPdf" type="button">PDF</button>
+      </div>
+      <div class="muted" style="margin-top:8px">Verantwortlich: ${wfUserLabel()}</div>
+    </div>
+  `;
+  initWfSignaturePad(document.getElementById("wfSigCanvas"), document.getElementById("wfSigClear"));
+
+  document.getElementById("wfHygClose").onclick = ()=> wfCloseHygiene();
+  document.getElementById("wfHygPdf").onclick = ()=> wfPreviewPdf("hygiene");
+}
+
+function wfCloseHygiene(){
+  const clean = document.getElementById("wfHygClean").checked;
+  const dis = document.getElementById("wfHygDis").checked;
+  const sep = document.getElementById("wfHygSep").checked;
+  const notes = (document.getElementById("wfHygNotes").value||"").trim();
+  const sig = wfSigDataUrl();
+  if(!sig){ alert("Bitte unterschreiben."); return; }
+  if(!clean || !dis || !sep){
+    if(!confirm("Nicht alle Punkte sind abgehakt. Trotzdem abschließen?")) return;
+  }
+  const entry = {
+    id: wfNewId(),
+    type: "hygiene",
+    date: wfTodayKey(),
+    createdAt: new Date().toISOString(),
+    createdBy: wfUserLabel(),
+    data: { clean, dis, sep, notes },
+    signature: sig
+  };
+  wfArchiveAdd(entry);
+  alert("Hygiene-Nachweis archiviert.");
+  wfShowArchive();
+}
+
+function wfShowShift(){
+  const host = document.getElementById("workformsView");
+  host.dataset.view="shift";
+  const today = wfTodayKey();
+  host.innerHTML = `
+    <div class="wf-form">
+      <h3>Übergabe / Schichtblatt (${today})</h3>
+      <div class="muted">Unterschrift Pflicht · Abschluss = Archivierung</div>
+      <div style="margin-top:10px">
+        <label class="field" style="display:block">
+          Heute aufgefallen
+          <textarea id="wfShiftToday" rows="4" style="width:100%"></textarea>
+        </label>
+      </div>
+      <div style="margin-top:10px">
+        <label class="field" style="display:block">
+          Morgen beachten
+          <textarea id="wfShiftTomorrow" rows="4" style="width:100%"></textarea>
+        </label>
+      </div>
+      <div style="margin-top:10px">
+        <div class="muted">Unterschrift</div>
+        <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">
+          <canvas id="wfSigCanvas" style="width:320px;max-width:100%;height:120px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.18)"></canvas>
+          <button class="btn" id="wfSigClear" type="button">Löschen</button>
+        </div>
+      </div>
+      <div class="wf-actions">
+        <button class="btn primary" id="wfShiftClose" type="button">Abschließen & bestätigen</button>
+        <button class="btn" id="wfShiftPdf" type="button">PDF</button>
+      </div>
+      <div class="muted" style="margin-top:8px">Verantwortlich: ${wfUserLabel()}</div>
+    </div>
+  `;
+  initWfSignaturePad(document.getElementById("wfSigCanvas"), document.getElementById("wfSigClear"));
+  document.getElementById("wfShiftClose").onclick = ()=> wfCloseShift();
+  document.getElementById("wfShiftPdf").onclick = ()=> wfPreviewPdf("shift");
+}
+
+function wfCloseShift(){
+  const todayText = (document.getElementById("wfShiftToday").value||"").trim();
+  const tomorrowText = (document.getElementById("wfShiftTomorrow").value||"").trim();
+  const sig = wfSigDataUrl();
+  if(!sig){ alert("Bitte unterschreiben."); return; }
+  const entry = {
+    id: wfNewId(),
+    type: "shift",
+    date: wfTodayKey(),
+    createdAt: new Date().toISOString(),
+    createdBy: wfUserLabel(),
+    data: { today: todayText, tomorrow: tomorrowText },
+    signature: sig
+  };
+  wfArchiveAdd(entry);
+  alert("Schichtblatt archiviert.");
+  wfShowArchive();
+}
+
+function wfShowIncident(){
+  const host = document.getElementById("workformsView");
+  host.dataset.view="incident";
+  const now = new Date();
+  host.innerHTML = `
+    <div class="wf-form">
+      <h3>Ereignisprotokoll</h3>
+      <div class="muted">Nur bei Bedarf · Unterschrift Pflicht · Abschluss = Archivierung</div>
+
+      <div class="wf-row" style="margin-top:10px">
+        <label class="field">Hund
+          <select id="wfIncDog" style="width:100%"></select>
+        </label>
+        <label class="field">Halter
+          <input id="wfIncOwner" type="text" style="width:100%" placeholder="automatisch (wenn bekannt)"/>
+        </label>
+      </div>
+
+      <div class="wf-row" style="margin-top:10px">
+        <label class="field">Art des Ereignisses
+          <select id="wfIncType" style="width:100%">
+            <option value="verletzung">Verletzung</option>
+            <option value="erkrankung">Erkrankung</option>
+            <option value="auseinandersetzung">Auseinandersetzung</option>
+            <option value="entlaufen">Entlaufen / Ausbruch</option>
+            <option value="tierarzt">Tierarzt / Behandlung</option>
+            <option value="sonstiges">Sonstiges</option>
+          </select>
+        </label>
+        <label class="field">Datum/Uhrzeit
+          <input id="wfIncWhen" type="text" style="width:100%" value="${now.toLocaleString("de-DE")}"/>
+        </label>
+      </div>
+
+      <div style="margin-top:10px">
+        <label class="field" style="display:block">
+          Beschreibung des Vorfalls
+          <textarea id="wfIncDesc" rows="4" style="width:100%"></textarea>
+        </label>
+      </div>
+
+      <div style="margin-top:10px">
+        <label class="field" style="display:block">
+          Getroffene Maßnahmen
+          <textarea id="wfIncActions" rows="4" style="width:100%"></textarea>
+        </label>
+      </div>
+
+      <div style="margin-top:10px">
+        <label class="field" style="display:block">
+          Besonderheiten (optional)
+          <textarea id="wfIncNotes" rows="3" style="width:100%"></textarea>
+        </label>
+      </div>
+
+      <div style="margin-top:10px">
+        <div class="muted">Unterschrift</div>
+        <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">
+          <canvas id="wfSigCanvas" style="width:320px;max-width:100%;height:120px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.18)"></canvas>
+          <button class="btn" id="wfSigClear" type="button">Löschen</button>
+        </div>
+      </div>
+
+      <div class="wf-actions">
+        <button class="btn primary" id="wfIncClose" type="button">Abschließen & bestätigen</button>
+        <button class="btn" id="wfIncPdf" type="button">PDF</button>
+      </div>
+      <div class="muted" style="margin-top:8px">Verantwortlich: ${wfUserLabel()}</div>
+    </div>
+  `;
+
+  // populate dog list from state
+  const sel = document.getElementById("wfIncDog");
+  sel.innerHTML = `<option value="">— auswählen —</option>` + (state.dogs||[]).map(d=>`<option value="${d.id}">${escapeHtml(d.name||"Hund")}</option>`).join("");
+  sel.onchange = ()=>{
+    const dog = (state.dogs||[]).find(d=>d.id===sel.value);
+    const owner = dog ? (getCustomer(dog.customerId)?.name || "") : "";
+    document.getElementById("wfIncOwner").value = owner;
+  };
+
+  initWfSignaturePad(document.getElementById("wfSigCanvas"), document.getElementById("wfSigClear"));
+  document.getElementById("wfIncClose").onclick = ()=> wfCloseIncident();
+  document.getElementById("wfIncPdf").onclick = ()=> wfPreviewPdf("incident");
+}
+
+function wfCloseIncident(){
+  const dogId = document.getElementById("wfIncDog").value || null;
+  const owner = (document.getElementById("wfIncOwner").value||"").trim();
+  const incType = document.getElementById("wfIncType").value;
+  const when = (document.getElementById("wfIncWhen").value||"").trim();
+  const desc = (document.getElementById("wfIncDesc").value||"").trim();
+  const actions = (document.getElementById("wfIncActions").value||"").trim();
+  const notes = (document.getElementById("wfIncNotes").value||"").trim();
+  const sig = wfSigDataUrl();
+  if(!sig){ alert("Bitte unterschreiben."); return; }
+  if(!desc){ alert("Bitte eine kurze Beschreibung eintragen."); return; }
+
+  const entry = {
+    id: wfNewId(),
+    type: "incident",
+    date: wfTodayKey(),
+    createdAt: new Date().toISOString(),
+    createdBy: wfUserLabel(),
+    data: { dogId, owner, incType, when, desc, actions, notes },
+    signature: sig
+  };
+  wfArchiveAdd(entry);
+  alert("Ereignisprotokoll archiviert.");
+  wfShowArchive();
+}
+
+function wfShowArchive(silent){
+  const host = document.getElementById("workformsView");
+  host.dataset.view="archive";
+  const items = state.worklogs || [];
+  const rows = items.map(it=>{
+    const title = it.type==="hygiene" ? "Hygiene-Nachweis" : (it.type==="shift" ? "Schichtblatt" : "Ereignisprotokoll");
+    const date = it.date || "";
+    const by = it.createdBy || "";
+    return `
+      <div class="wf-archive-item">
+        <div>
+          <div><strong>${title}</strong></div>
+          <div class="meta">${escapeHtml(date)} · ${escapeHtml(by)}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" type="button" data-wf-open="${it.id}">Anzeigen</button>
+          <button class="btn" type="button" data-wf-pdf="${it.id}">PDF</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  host.innerHTML = `
+    <div class="wf-form">
+      <h3>Archiv Arbeitsblätter</h3>
+      <div class="muted">Abgeschlossene Nachweise – unveränderbar</div>
+      <div style="margin-top:10px">${rows || '<div class="muted">Noch keine Einträge.</div>'}</div>
+    </div>
+  `;
+
+  host.querySelectorAll("[data-wf-open]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = btn.getAttribute("data-wf-open");
+      wfShowEntry(id);
+    });
+  });
+  host.querySelectorAll("[data-wf-pdf]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = btn.getAttribute("data-wf-pdf");
+      wfEntryPdf(id);
+    });
+  });
+
+  if(!silent){
+    // nothing
+  }
+}
+
+function wfShowEntry(id){
+  const it = (state.worklogs||[]).find(x=>x.id===id);
+  if(!it) return;
+  const host = document.getElementById("workformsView");
+  const title = it.type==="hygiene" ? "Hygiene-Nachweis" : (it.type==="shift" ? "Übergabe / Schichtblatt" : "Ereignisprotokoll");
+  const meta = `${it.date||""} · ${it.createdBy||""}`;
+  let body = "";
+  if(it.type==="hygiene"){
+    body = `
+      <div class="box">
+        <div class="grid">
+          <div><div class="k">Reinigung</div><div class="v">${it.data.clean ? "Ja" : "Nein"}</div></div>
+          <div><div class="k">Desinfektion</div><div class="v">${it.data.dis ? "Ja" : "Nein"}</div></div>
+          <div><div class="k">Trennung eingehalten</div><div class="v">${it.data.sep ? "Ja" : "Nein"}</div></div>
+        </div>
+        <div class="muted" style="margin-top:8px">Besonderheiten: ${escapeHtml(it.data.notes||"—")}</div>
+      </div>
+    `;
+  } else if(it.type==="shift"){
+    body = `
+      <div class="box">
+        <div class="k">Heute aufgefallen</div>
+        <div class="v">${escapeHtml(it.data.today||"—")}</div>
+      </div>
+      <div class="box">
+        <div class="k">Morgen beachten</div>
+        <div class="v">${escapeHtml(it.data.tomorrow||"—")}</div>
+      </div>
+    `;
+  } else {
+    body = `
+      <div class="box">
+        <div class="grid">
+          <div><div class="k">Hund</div><div class="v">${escapeHtml((getPet(it.data.dogId||"")?.name)||"—")}</div></div>
+          <div><div class="k">Halter</div><div class="v">${escapeHtml(it.data.owner||"—")}</div></div>
+        </div>
+        <div style="margin-top:8px" class="muted">Art: ${escapeHtml(it.data.incType||"")} · Zeitpunkt: ${escapeHtml(it.data.when||"")}</div>
+      </div>
+      <div class="box">
+        <div class="k">Beschreibung</div>
+        <div class="v">${escapeHtml(it.data.desc||"")}</div>
+      </div>
+      <div class="box">
+        <div class="k">Maßnahmen</div>
+        <div class="v">${escapeHtml(it.data.actions||"")}</div>
+      </div>
+      <div class="box">
+        <div class="k">Besonderheiten</div>
+        <div class="v">${escapeHtml(it.data.notes||"—")}</div>
+      </div>
+    `;
+  }
+  host.innerHTML = `
+    <div class="wf-form">
+      <h3>${title}</h3>
+      <div class="muted">${escapeHtml(meta)}</div>
+      ${body}
+      <div class="box sig">
+        <div class="k">Unterschrift</div>
+        <img src="${it.signature}" alt="Unterschrift"/>
+      </div>
+      <div class="wf-actions">
+        <button class="btn" type="button" id="wfBack">Zurück</button>
+        <button class="btn" type="button" id="wfPdf">PDF</button>
+      </div>
+    </div>
+  `;
+  document.getElementById("wfBack").onclick = ()=> wfShowArchive(true);
+  document.getElementById("wfPdf").onclick = ()=> wfEntryPdf(id);
+}
+
+function wfEntryPdf(id){
+  const it = (state.worklogs||[]).find(x=>x.id===id);
+  if(!it) return;
+  const title = it.type==="hygiene" ? "Hygiene-Nachweis" : (it.type==="shift" ? "Übergabe / Schichtblatt" : "Ereignisprotokoll");
+  const body = `
+    <h1>${title}</h1>
+    <div class="meta">Datum: ${escapeHtml(it.date||"")} · Verantwortlich: ${escapeHtml(it.createdBy||"")}<br/>Erstellt: ${escapeHtml(it.createdAt||"")}</div>
+    ${(() => {
+      if(it.type==="hygiene"){
+        return `<div class="box">
+          <table>
+            <tr><th>Punkt</th><th>Status</th></tr>
+            <tr><td>Reinigung durchgeführt</td><td>${it.data.clean?"Ja":"Nein"}</td></tr>
+            <tr><td>Desinfektion durchgeführt</td><td>${it.data.dis?"Ja":"Nein"}</td></tr>
+            <tr><td>Trennung eingehalten</td><td>${it.data.sep?"Ja":"Nein"}</td></tr>
+          </table>
+          <div class="muted" style="margin-top:8px">Besonderheiten/Abweichungen: ${escapeHtml(it.data.notes||"—")}</div>
+        </div>`;
+      }
+      if(it.type==="shift"){
+        return `<div class="box"><div class="k">Heute aufgefallen</div><div class="v">${escapeHtml(it.data.today||"—")}</div></div>
+                <div class="box"><div class="k">Morgen beachten</div><div class="v">${escapeHtml(it.data.tomorrow||"—")}</div></div>`;
+      }
+      return `<div class="box">
+        <div class="grid">
+          <div><div class="k">Hund</div><div class="v">${escapeHtml((getPet(it.data.dogId||"")?.name)||"—")}</div></div>
+          <div><div class="k">Halter</div><div class="v">${escapeHtml(it.data.owner||"—")}</div></div>
+        </div>
+        <div class="muted" style="margin-top:8px">Art: ${escapeHtml(it.data.incType||"")} · Zeitpunkt: ${escapeHtml(it.data.when||"")}</div>
+      </div>
+      <div class="box"><div class="k">Beschreibung</div><div class="v">${escapeHtml(it.data.desc||"")}</div></div>
+      <div class="box"><div class="k">Maßnahmen</div><div class="v">${escapeHtml(it.data.actions||"")}</div></div>
+      <div class="box"><div class="k">Besonderheiten</div><div class="v">${escapeHtml(it.data.notes||"—")}</div></div>`;
+    })()}
+    <div class="box sig">
+      <div class="k">Unterschrift</div>
+      <img src="${it.signature}" alt="Unterschrift"/>
+    </div>
+    <div class="muted">Dokument ist nach Abschluss unveränderbar (Archiv).</div>
+  `;
+  wfOpenPdf(wfPdfTemplate(title, body));
+}
+
+function wfPreviewPdf(kind){
+  // preview current unsaved form
+  const title = kind==="hygiene" ? "Hygiene-Nachweis" : (kind==="shift" ? "Übergabe / Schichtblatt" : "Ereignisprotokoll");
+  const sig = wfSigDataUrl();
+  const baseMeta = `<div class="meta">Datum: ${escapeHtml(wfTodayKey())} · Verantwortlich: ${escapeHtml(wfUserLabel())}</div>`;
+  let body = `<h1>${title}</h1>${baseMeta}<div class="muted">Vorschau (noch nicht archiviert)</div>`;
+  if(kind==="hygiene"){
+    const clean=document.getElementById("wfHygClean")?.checked;
+    const dis=document.getElementById("wfHygDis")?.checked;
+    const sep=document.getElementById("wfHygSep")?.checked;
+    const notes=(document.getElementById("wfHygNotes")?.value||"").trim();
+    body += `<div class="box"><table>
+      <tr><th>Punkt</th><th>Status</th></tr>
+      <tr><td>Reinigung durchgeführt</td><td>${clean?"Ja":"Nein"}</td></tr>
+      <tr><td>Desinfektion durchgeführt</td><td>${dis?"Ja":"Nein"}</td></tr>
+      <tr><td>Trennung eingehalten</td><td>${sep?"Ja":"Nein"}</td></tr>
+    </table><div class="muted" style="margin-top:8px">Besonderheiten/Abweichungen: ${escapeHtml(notes||"—")}</div></div>`;
+  } else if(kind==="shift"){
+    const t=(document.getElementById("wfShiftToday")?.value||"").trim();
+    const m=(document.getElementById("wfShiftTomorrow")?.value||"").trim();
+    body += `<div class="box"><div class="k">Heute aufgefallen</div><div class="v">${escapeHtml(t||"—")}</div></div>
+             <div class="box"><div class="k">Morgen beachten</div><div class="v">${escapeHtml(m||"—")}</div></div>`;
+  } else {
+    const dogId=document.getElementById("wfIncDog")?.value||"";
+    const owner=(document.getElementById("wfIncOwner")?.value||"").trim();
+    const incType=document.getElementById("wfIncType")?.value||"";
+    const when=(document.getElementById("wfIncWhen")?.value||"").trim();
+    const desc=(document.getElementById("wfIncDesc")?.value||"").trim();
+    const actions=(document.getElementById("wfIncActions")?.value||"").trim();
+    const notes=(document.getElementById("wfIncNotes")?.value||"").trim();
+    body += `<div class="box"><div class="grid">
+      <div><div class="k">Hund</div><div class="v">${escapeHtml((getPet(dogId)?.name)||"—")}</div></div>
+      <div><div class="k">Halter</div><div class="v">${escapeHtml(owner||"—")}</div></div>
+    </div><div class="muted" style="margin-top:8px">Art: ${escapeHtml(incType)} · Zeitpunkt: ${escapeHtml(when)}</div></div>
+    <div class="box"><div class="k">Beschreibung</div><div class="v">${escapeHtml(desc||"—")}</div></div>
+    <div class="box"><div class="k">Maßnahmen</div><div class="v">${escapeHtml(actions||"—")}</div></div>
+    <div class="box"><div class="k">Besonderheiten</div><div class="v">${escapeHtml(notes||"—")}</div></div>`;
+  }
+  body += `<div class="box sig"><div class="k">Unterschrift</div>${sig?`<img src="${sig}" alt="Unterschrift"/>`:`<div class="muted">— noch keine Unterschrift —</div>`}</div>`;
+  wfOpenPdf(wfPdfTemplate(title, body));
+}
+
+function wfTodayPrint(){
+  // simple: reuse existing today dashboard pdf builder if present; otherwise fallback
+  // build a minimal overview from stays
+  const today = wfTodayKey();
+  const staysToday = (state.stays||[]).filter(s=>{
+    const from = s.fromDate || s.startDate || s.betreuungVon || "";
+    const to = s.toDate || s.endDate || s.betreuungBis || "";
+    if(!from || !to) return false;
+    return (today >= from && today <= to);
+  });
+  const rows = staysToday.map(s=>{
+    const dog = getPet(s.dogId||"") || {};
+    const cust = getCustomer(s.customerId||dog.customerId||"") || {};
+    return `<tr><td>${escapeHtml(dog.name||"")}</td><td>${escapeHtml(cust.name||"")}</td><td>${escapeHtml(s.type||s.betreuungsart||"")}</td></tr>`;
+  }).join("");
+  const body = `
+    <h1>Heute – Übersicht (${escapeHtml(today)})</h1>
+    <div class="meta">Erstellt: ${new Date().toLocaleString("de-DE")} · Verantwortlich: ${escapeHtml(wfUserLabel())}</div>
+    <div class="box">
+      <table>
+        <tr><th>Hund</th><th>Halter</th><th>Betreuung</th></tr>
+        ${rows || '<tr><td colspan="3">Keine Aufenthalte gefunden.</td></tr>'}
+      </table>
+    </div>
+    <div class="box">
+      <h2 style="font-size:14px;margin:0 0 6px">Übergabe / Schichtblatt</h2>
+      <div class="muted">Hinweis: Schichtblatt bitte in der App ausfüllen & abschließen, um es zu archivieren.</div>
+      <div style="margin-top:8px;border:1px dashed #aaa;padding:10px;border-radius:10px">
+        <div class="k">Heute aufgefallen</div><div style="height:60px"></div>
+        <div class="k">Morgen beachten</div><div style="height:60px"></div>
+        <div class="k">Unterschrift</div><div style="height:60px"></div>
+      </div>
+    </div>
+  `;
+  wfOpenPdf(wfPdfTemplate("Heute drucken", body));
+}
+
+

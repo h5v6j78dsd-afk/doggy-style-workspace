@@ -23,6 +23,8 @@
 <button class="tab is-active" data-tab="home">Start</button>
 <button class="tab" data-tab="documents">Aufenthalte</button>
 <button class="tab" data-tab="dogs">Hunde/Kunden</button>
+<button class="tab" data-tab="contract">Betreuungsvertrag</button>
+<button class="tab" data-tab="workforms">Arbeitsblätter</button>
 <button class="tab" data-tab="settings">Einstellungen</button><button class="tab" data-tab="invoices">Rechnungen</button>
 </nav>
 </header>
@@ -55,28 +57,6 @@
 <div class="hero-sub" id="todayBoardingText">Ruhiger Tag</div>
 </div>
 </div>
-
-<!-- Today -->
-<div class="card">
-  <h2>Heute auf dem Hof</h2>
-  <div class="today-grid">
-    <div class="today-note">
-      <label class="field">
-        <span><strong>Heute wichtig (intern)</strong></span>
-        <textarea id="todayNote" rows="4" placeholder="Kurze interne Notizen für heute…"></textarea>
-      </label>
-      <div class="hint">Hinweis: Diese Notiz gilt nur für heute und wird automatisch täglich getrennt gespeichert.</div>
-    </div>
-    <div class="today-list">
-      <div class="row between" style="margin-bottom:8px;">
-        <div class="muted"><strong>Anwesend / geplant heute</strong></div>
-        <div class="muted" id="todayCount"></div>
-      </div>
-      <div id="todayStaysList" class="today-stays"></div>
-    </div>
-  </div>
-</div>
-
 <!-- Forecast -->
 <div class="card">
 <h2>Auslastung – nächste 14 Tage</h2>
@@ -228,6 +208,113 @@
 <div class="list" id="dogList"></div>
 </div>
 </section>
+<section class="panel" id="contract">
+  <div class="card">
+    <h2>Betreuungsvertrag</h2>
+    <div id="contractStatusBanner" class="muted" style="margin-bottom:10px;"></div>
+
+    <div class="contract-wrap">
+      <div class="contract-doc">
+        <div class="contract-head">
+          <div class="contract-brand">
+            <img src="assets/logo.png" alt="Doggy Style" class="contract-logo"/>
+            <div>
+              <div class="contract-title" id="contractTitle">Betreuungsvertrag für Hunde</div>
+              <div class="contract-meta" id="contractMeta">Doggy Style Hundepension · Version v1.0 · Gültig ab 27.12.2025</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="contract-text" id="contractText"></div>
+      </div>
+
+      <div class="contract-side">
+        <div class="contract-card">
+          <h3>Unterschrift</h3>
+
+          <div class="row">
+            <label>Kunde</label>
+            <select id="contractCustomerSelect"></select>
+          </div>
+
+          <div class="row">
+            <label>Hund</label>
+            <select id="contractPetSelect"></select>
+          </div>
+
+          <label class="checkline">
+            <input type="checkbox" id="contractAcceptChk">
+            <span>Ich habe den Betreuungsvertrag gelesen und akzeptiere ihn.</span>
+          </label>
+
+          <div class="sigbox">
+            <canvas id="contractSig" width="520" height="180"></canvas>
+          </div>
+
+          <div class="actions">
+            <button class="smallbtn" id="contractSigClear">Unterschrift löschen</button>
+            <button class="primary" id="contractSignBtn">Unterschreiben</button>
+            <button class="btn" id="contractPdfBtn" type="button">📄 PDF</button>
+          </div>
+
+          <div class="muted" id="contractSignedInfo" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="contract-card" id="contractAdminBox" style="display:none;">
+          <h3>Admin</h3>
+          <div class="muted">Wenn du den Vertrag änderst, wird automatisch eine neue Version erzeugt und Kunden müssen neu unterschreiben.</div>
+          <div class="row">
+            <label>Vertragstext bearbeiten</label>
+            <textarea id="contractEditText" rows="10"></textarea>
+          </div>
+          <div class="actions">
+            <button class="smallbtn" id="contractResetEdit">Zurücksetzen</button>
+            <button class="primary" id="contractPublish">Neue Version veröffentlichen</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="panel" id="workforms">
+  <div class="panel__head">
+    <h2>Arbeitsblätter</h2>
+    <div class="muted">Nachweise & Übersichten für den Tagesbetrieb (Archiv + Unterschrift)</div>
+  </div>
+
+  <div class="glass-grid">
+    <button class="glass-card" id="wfBtnTodayPrint">
+      <div class="glass-card__title">Heute drucken</div>
+      <div class="glass-card__sub">Sammel-PDF: Heute-Übersicht, Kommen/Gehen, Hundeblätter, Schichtblatt</div>
+    </button>
+
+    <button class="glass-card" id="wfBtnHygiene">
+      <div class="glass-card__title">Hygiene-Nachweis</div>
+      <div class="glass-card__sub">Täglicher Nachweis mit Unterschrift & Archiv</div>
+    </button>
+
+    <button class="glass-card" id="wfBtnShift">
+      <div class="glass-card__title">Übergabe / Schichtblatt</div>
+      <div class="glass-card__sub">Heute aufgefallen · Morgen beachten · Unterschrift</div>
+    </button>
+
+    <button class="glass-card" id="wfBtnIncident">
+      <div class="glass-card__title">Ereignisprotokoll</div>
+      <div class="glass-card__sub">Nur bei Bedarf – für Vorfälle/Notfälle</div>
+    </button>
+
+    <button class="glass-card" id="wfBtnArchive">
+      <div class="glass-card__title">Archiv</div>
+      <div class="glass-card__sub">Alle abgeschlossenen Nachweise – PDF jederzeit</div>
+    </button>
+  </div>
+
+  <div id="workformsView" class="workforms-view"></div>
+</section>
+
 <section class="panel" id="settings">
 <div class="card">
 <h1>Einstellungen</h1>
@@ -252,6 +339,7 @@
 <h1 id="editorTitle">Dokument</h1>
 <div class="card" id="versionBox" style="margin-top:12px"></div>
 <div class="muted" id="editorMeta"></div>
+<div class="warn-banner" id="contractWarnBanner" style="display:none; margin-top:10px;"></div>
 </div>
 <div class="row">
 <button class="btn" id="btnSave">Speichern</button>
@@ -294,7 +382,7 @@
 <script defer="defer" src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script defer="defer" src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script defer="defer" src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
-<script defer="defer" src="app.js?v=20251227g"></script>
+<script defer="defer" src="app.js?v=20251227h"></script>
 <script>
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=20251227d');
   </script>
