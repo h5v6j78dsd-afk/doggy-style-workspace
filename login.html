@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>Doggy Style Workspace · Login</title>
+  <link href="manifest.json" rel="manifest"/>
+  <meta name="theme-color" content="#101014"/>
+  <link href="assets/logo.png" rel="apple-touch-icon"/>
+  <link href="styles.css?v=20251227g" rel="stylesheet"/>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img alt="Doggy Style" class="brand__logo brand__logo--big" src="assets/logo.png"/>
+      <div class="brand__text">
+        <div class="brand__title">Doggy Style Workspace</div>
+        <div class="brand__sub">Bitte anmelden</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="panel is-active">
+      <div class="card" style="max-width:520px;margin:0 auto;">
+        <h1 style="margin:0 0 8px 0;">Anmelden</h1>
+        <p class="muted">Für geräteübergreifende Daten bitte anmelden. (Login wird bei jedem Öffnen verlangt.)</p>
+
+        <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:14px">
+          <label class="field" style="min-width:260px; flex:1;">
+            <span>E‑Mail</span>
+            <input id="loginEmail" type="email" autocomplete="username" inputmode="email" placeholder="name@domain.de"/>
+          </label>
+
+          <label class="field" style="min-width:260px; flex:1;">
+            <span>Passwort</span>
+            <input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••••"/>
+          </label>
+        </div>
+
+        <div class="row" style="margin-top:14px; gap:10px; flex-wrap:wrap;">
+          <button id="btnLogin" class="primary">Anmelden</button>
+          <button id="btnRegister">Registrieren</button>
+        </div>
+
+        <p id="authMsg" class="muted" style="margin-top:10px"></p>
+      </div>
+    </section>
+  </main>
+
+  <script defer src="firebase-config.js?v=20251227g"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script defer src="auth.js?v=20251227g"></script>
+</body>
+</html>

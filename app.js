@@ -18,7 +18,7 @@ const CLOUD = {
   db: null,
   orgId: (window.firebaseOrgId || "doggystyle"),
   // Wenn true: bei jedem App-Start Login erzwingen (kein "eingeloggt bleiben")
-  forceLoginAlways: true,
+  forceLoginAlways: false,
   adminEmails: (window.firebaseAdminEmails || []),
   user: null,
   role: "local",
@@ -2301,8 +2301,11 @@ async function startApp(){
     CLOUD.user = user || null;
     if(!user){
       CLOUD.role = 'guest';
-      showAuthGate(true);
-      if(document.getElementById('btnLogout')) document.getElementById('btnLogout').style.display='none';
+      // In dieser Version gibt es kein Login-Overlay mehr. Wenn nicht eingeloggt: auf Login-Seite umleiten.
+      try{
+        const p = (location && location.pathname) ? location.pathname.toLowerCase() : '';
+        if(!p.endsWith('login.html')) location.href = 'login.html';
+      }catch(e){}
       return;
     }
 

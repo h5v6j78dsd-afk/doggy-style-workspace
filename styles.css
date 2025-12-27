@@ -100,3 +100,5 @@ textarea{min-height:88px;resize:vertical}
 .tab, button{cursor:pointer;touch-action:manipulation;}
 button:disabled{cursor:not-allowed;}
 .tabs{gap:10px;flex-wrap:wrap;}
+
+.brand__logo--big{height:56px;width:auto;opacity:1;filter:drop-shadow(0 6px 18px rgba(0,0,0,.35));}
