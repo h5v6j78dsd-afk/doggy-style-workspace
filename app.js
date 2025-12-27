@@ -1,4 +1,6 @@
 window.addEventListener("error",(e)=>{console.error("APP_ERROR",e.error||e.message);});
+const $=s=>document.querySelector(s);
+const $$=s=>Array.from(document.querySelectorAll(s));
 const LS_KEY="ds_workspace_v1";
 const CAPACITY = {
   Tagesbetreuung: 13,
@@ -291,8 +293,6 @@ const state=loadState();const COMPANY = {
 };;if(state.nextInvoiceNumber == null){
   state.nextInvoiceNumber = 1;
 }renderDashboard();renderRecent();
-const $=s=>document.querySelector(s);
-const $$=s=>Array.from(document.querySelectorAll(s));
 function formatDateDE(dateStr){
   const d = new Date(dateStr);
   return d.toLocaleDateString("de-DE");
