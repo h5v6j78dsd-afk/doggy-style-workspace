@@ -48,9 +48,10 @@ async function cloudInit(){
     CLOUD.app = window.firebase.initializeApp(window.firebaseConfig);
     CLOUD.auth = window.firebase.auth();
     CLOUD.db = window.firebase.firestore();
-    // Session nicht dauerhaft speichern (Keychain-Autofill nutzen wir separat)
+    // Session nicht dauerhaft speichern (Login bei jedem Start erzwingen)
     try {
-      if (CLOUD.forceLoginAlways && CLOUD.auth && window.firebase?.auth?.Auth?.Persistence) {
+      if (CLOUD.forceLoginAlways && CLOUD.auth) {
+        // Firebase compat: NICHT speichern -> kein Auto-Login nach Reload
         await CLOUD.auth.setPersistence(window.firebase.auth.Auth.Persistence.NONE);
       }
     } catch(e) { /* ignore */ }
@@ -2296,6 +2297,17 @@ async function startApp(){
   // Auth state
   CLOUD.auth.onAuthStateChanged(async (user)=>{
     CLOUD.user = user || null;
+
+    // Login bei jedem Start erzwingen:
+    // Falls Firebase noch einen alten Login aus IndexedDB/LocalStorage wiederherstellt,
+    // melden wir sofort wieder ab, damit immer der Login-Dialog kommt.
+    if (CLOUD.forceLoginAlways && user && !CLOUD._forcedLogoutDone) {
+      CLOUD._forcedLogoutDone = true;
+      try { await CLOUD.auth.signOut(); } catch(e) {}
+      showAuthGate(true);
+      if(btnLogout) btnLogout.style.display = "none";
+      return;
+    }
     if(!user){
       // nicht eingeloggt
       showAuthGate(true);
@@ -2358,6 +2370,31 @@ async function startApp(){
     });
   });
 }
+
+
+  // Option C (iPad/PWA): auch beim "Wieder-Öffnen" (ohne Reload) Login erzwingen
+  if (CLOUD.forceLoginAlways) {
+    let _forcing = false;
+    const forceLoginNow = async () => {
+      if (_forcing) return;
+      _forcing = true;
+      try {
+        const u = CLOUD.auth && CLOUD.auth.currentUser;
+        if (u) {
+          await CLOUD.auth.signOut();
+        }
+      } catch (e) { /* ignore */ }
+      try { showAuthGate(true); } catch(e) {}
+      _forcing = false;
+    };
+
+    // Wenn die App wieder in den Vordergrund kommt (iPad PWA lädt oft nicht neu)
+    window.addEventListener("pageshow", () => { forceLoginNow(); });
+    window.addEventListener("focus", () => { forceLoginNow(); });
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) forceLoginNow();
+    });
+  }
 
 // Start
 startApp().catch(console.error);

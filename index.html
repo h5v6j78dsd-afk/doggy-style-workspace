@@ -28,71 +28,62 @@
 </header>
 <main class="shell">
 <section class="panel is-active" id="home">
-  <section class="dashboard">
-
-    <!-- HERO -->
-    <div class="hero-cards">
-      <div class="hero-card">
-        <div class="hero-header">
-          <span class="hero-icon">🐕</span>
-          <span class="hero-title">Tagesbetreuung</span>
-        </div>
-        <div class="hero-value" id="todayDaycareValue">0 / 13</div>
-        <div class="hero-bar"><div class="hero-bar-fill" id="todayDaycareBar"></div></div>
-        <div class="hero-sub" id="todayDaycareText">Ruhiger Tag</div>
+<section class="dashboard">
+<!-- HERO -->
+<div class="hero-cards">
+<div class="hero-card">
+<div class="hero-header">
+<span class="hero-icon">🐕</span>
+<span class="hero-title">Tagesbetreuung</span>
+</div>
+<div class="hero-value" id="todayDaycareValue">0 / 13</div>
+<div class="hero-bar"><div class="hero-bar-fill" id="todayDaycareBar"></div></div>
+<div class="hero-sub" id="todayDaycareText">Ruhiger Tag</div>
+</div>
+<div class="hero-card">
+<div class="hero-header">
+<span class="hero-icon">🏡</span>
+<span class="hero-title">Urlaubsbetreuung</span>
+</div>
+<div class="hero-value" id="todayBoardingValue">0 / 10</div>
+<div class="hero-bar"><div class="hero-bar-fill" id="todayBoardingBar"></div></div>
+<div class="hero-sub" id="todayBoardingText">Ruhiger Tag</div>
+</div>
+</div>
+<!-- Forecast -->
+<div class="card">
+<h2>Auslastung – nächste 14 Tage</h2>
+<div class="forecast-list" id="forecastList"></div>
+</div>
+<!-- Quick actions -->
+<div class="card">
+<h2>Schnellaktionen</h2>
+<div class="quick-actions">
+<button class="btn primary" onclick="createStay()">➕ Neuer Aufenthalt</button>
+<button class="btn" onclick="openDogs()">🐶 Hunde/Kunden</button>
+<button class="btn" onclick="openInvoices()">🧾 Rechnungen</button>
+<button class="btn" onclick="selectTab('settings')">⚙️ Einstellungen</button>
+</div>
+<!-- Hidden legacy controls (kept for compatibility) -->
+<div class="row" style="display:none">
+<label class="field">
+<span>Vorlage</span>
+<select id="templateSelect"></select>
+</label>
+<button class="btn primary" id="btnNewDoc">Aufenthalt erstellen</button>
+</div>
+<div class="hint">
+<strong>Tipp:</strong> Installiere die App als PWA: In Safari <em>Teilen → Zum Home‑Bildschirm</em>.
       </div>
-
-      <div class="hero-card">
-        <div class="hero-header">
-          <span class="hero-icon">🏡</span>
-          <span class="hero-title">Urlaubsbetreuung</span>
-        </div>
-        <div class="hero-value" id="todayBoardingValue">0 / 10</div>
-        <div class="hero-bar"><div class="hero-bar-fill" id="todayBoardingBar"></div></div>
-        <div class="hero-sub" id="todayBoardingText">Ruhiger Tag</div>
-      </div>
-    </div>
-
-    <!-- Forecast -->
-    <div class="card">
-      <h2>Auslastung – nächste 14 Tage</h2>
-      <div id="forecastList" class="forecast-list"></div>
-    </div>
-
-    <!-- Quick actions -->
-    <div class="card">
-      <h2>Schnellaktionen</h2>
-      <div class="quick-actions">
-        <button class="btn primary" onclick="createStay()">➕ Neuer Aufenthalt</button>
-        <button class="btn" onclick="openDogs()">🐶 Hunde/Kunden</button>
-        <button class="btn" onclick="openInvoices()">🧾 Rechnungen</button>
-        <button class="btn" onclick="selectTab('settings')">⚙️ Einstellungen</button>
-      </div>
-
-      <!-- Hidden legacy controls (kept for compatibility) -->
-      <div class="row" style="display:none">
-        <label class="field">
-          <span>Vorlage</span>
-          <select id="templateSelect"></select>
-        </label>
-        <button class="btn primary" id="btnNewDoc">Aufenthalt erstellen</button>
-      </div>
-
-      <div class="hint">
-        <strong>Tipp:</strong> Installiere die App als PWA: In Safari <em>Teilen → Zum Home‑Bildschirm</em>.
-      </div>
-    </div>
-
-    <!-- Warnings -->
-    <div class="card warning" id="dashboardWarnings" style="display:none"></div>
-
-    <!-- Recent -->
-    <div class="card">
-      <h2>Zuletzt</h2>
-      <div class="list" id="recentList"></div>
-    </div>
-
-  </section>
+</div>
+<!-- Warnings -->
+<div class="card warning" id="dashboardWarnings" style="display:none"></div>
+<!-- Recent -->
+<div class="card">
+<h2>Zuletzt</h2>
+<div class="list" id="recentList"></div>
+</div>
+</section>
 </section>
 <section class="panel" id="documents">
 <div class="card">
@@ -127,36 +118,32 @@
 <div class="row" style="flex-wrap:wrap; gap:12px;">
 <h3>Kunde (Halter)</h3>
 <div class="row" style="flex-wrap:wrap; gap:12px;">
-  <label class="field"><span>Name <span class="req">*</span></span><input id="c_name" placeholder="Max Müller" type="text"/></label>
-  <label class="field"><span>Telefon <span class="req">*</span></span><input id="c_phone" placeholder="+49 ..." type="tel"/></label>
+<label class="field"><span>Name <span class="req">*</span></span><input id="c_name" placeholder="Max Müller" type="text"/></label>
+<label class="field"><span>Telefon <span class="req">*</span></span><input id="c_phone" placeholder="+49 ..." type="tel"/></label>
 </div>
-
 <details class="opt">
-  <summary>Adresse & Kontakt (optional)</summary>
-  <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
-    <label class="field"><span>E‑Mail</span><input id="c_email" placeholder="mail@..." type="email"/></label>
-    <label class="field"><span>Straße/Hausnr.</span><input id="c_street" type="text"/></label>
-    <label class="field"><span>PLZ</span><input id="c_zip" type="text"/></label>
-    <label class="field"><span>Ort</span><input id="c_city" type="text"/></label>
-  </div>
+<summary>Adresse &amp; Kontakt (optional)</summary>
+<div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
+<label class="field"><span>E‑Mail</span><input id="c_email" placeholder="mail@..." type="email"/></label>
+<label class="field"><span>Straße/Hausnr.</span><input id="c_street" type="text"/></label>
+<label class="field"><span>PLZ</span><input id="c_zip" type="text"/></label>
+<label class="field"><span>Ort</span><input id="c_city" type="text"/></label>
+</div>
 </details>
-
 <details class="opt">
-  <summary>Notfall & Abholung (optional)</summary>
-  <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
-    <label class="field"><span>Notfallkontakt – Name</span><input id="c_em_name" type="text"/></label>
-    <label class="field"><span>Notfallkontakt – Telefon</span><input id="c_em_phone" type="tel"/></label>
-    <label class="field" style="min-width:100%;"><span>Abholberechtigt (Freitext)</span><input id="c_pickup_auth" type="text" placeholder="z.B. Oma, Nachbar, ..."/></label>
-  </div>
+<summary>Notfall &amp; Abholung (optional)</summary>
+<div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
+<label class="field"><span>Notfallkontakt – Name</span><input id="c_em_name" type="text"/></label>
+<label class="field"><span>Notfallkontakt – Telefon</span><input id="c_em_phone" type="tel"/></label>
+<label class="field" style="min-width:100%;"><span>Abholberechtigt (Freitext)</span><input id="c_pickup_auth" placeholder="z.B. Oma, Nachbar, ..." type="text"/></label>
+</div>
 </details>
-
-<details class="opt" open>
-  <summary>Notizen (optional)</summary>
-  <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
-    <label class="field" style="min-width:100%;"><span>Interne Notiz</span><textarea id="c_note" rows="2"></textarea></label>
-  </div>
+<details class="opt" open="">
+<summary>Notizen (optional)</summary>
+<div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
+<label class="field" style="min-width:100%;"><span>Interne Notiz</span><textarea id="c_note" rows="2"></textarea></label>
+</div>
 </details>
-
 </div>
 </div>
 <div class="card">
@@ -164,47 +151,43 @@
 <div class="row" style="flex-wrap:wrap; gap:12px;">
 <h3>Hund</h3>
 <div class="row" style="flex-wrap:wrap; gap:12px;">
-  <label class="field"><span>Name <span class="req">*</span></span><input id="p_name" placeholder="Bello" type="text"/></label>
-  <label class="field"><span>Rasse / Mix</span><input id="p_breed" type="text"/></label>
-  <label class="field"><span>Geburtsdatum</span><input id="p_birthdate" type="date"/></label>
+<label class="field"><span>Name <span class="req">*</span></span><input id="p_name" placeholder="Bello" type="text"/></label>
+<label class="field"><span>Rasse / Mix</span><input id="p_breed" type="text"/></label>
+<label class="field"><span>Geburtsdatum</span><input id="p_birthdate" type="date"/></label>
 </div>
-
 <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
-  <label class="field"><span>Gechippt? <span class="req">*</span></span>
-    <select id="p_chipStatus">
-      <option value="">— bitte wählen —</option>
-      <option value="yes">Ja</option>
-      <option value="no">Nein</option>
-    </select>
-  </label>
-  <label class="field"><span>Chipnummer (wenn Ja)</span><input id="p_chipNumber" type="text"/></label>
+<label class="field"><span>Gechippt? <span class="req">*</span></span>
+<select id="p_chipStatus">
+<option value="">— bitte wählen —</option>
+<option value="yes">Ja</option>
+<option value="no">Nein</option>
+</select>
+</label>
+<label class="field"><span>Chipnummer (wenn Ja)</span><input id="p_chipNumber" type="text"/></label>
 </div>
-
 <details class="opt">
-  <summary>Gesundheit (optional)</summary>
-  <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
-    <label class="field"><span>Tierarzt (Name/Ort)</span><input id="p_vet" type="text"/></label>
-    <label class="field"><span>Tierarzt Telefon</span><input id="p_vetPhone" type="tel"/></label>
-    <label class="field" style="min-width:100%;"><span>Allergien / Unverträglichkeiten</span><textarea id="p_allergies" rows="2"></textarea></label>
-    <label class="field" style="min-width:100%;"><span>Dauermedikation (Name + Dosierung)</span><textarea id="p_meds" rows="2"></textarea></label>
-  </div>
+<summary>Gesundheit (optional)</summary>
+<div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
+<label class="field"><span>Tierarzt (Name/Ort)</span><input id="p_vet" type="text"/></label>
+<label class="field"><span>Tierarzt Telefon</span><input id="p_vetPhone" type="tel"/></label>
+<label class="field" style="min-width:100%;"><span>Allergien / Unverträglichkeiten</span><textarea id="p_allergies" rows="2"></textarea></label>
+<label class="field" style="min-width:100%;"><span>Dauermedikation (Name + Dosierung)</span><textarea id="p_meds" rows="2"></textarea></label>
+</div>
 </details>
-
 <details class="opt">
-  <summary>Alltag & Verhalten (optional)</summary>
-  <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
-    <label class="field"><span>Standard-Futter</span><input id="p_food" type="text"/></label>
-    <label class="field"><span>Fütterung (Menge/Zeiten)</span><input id="p_feeding" type="text"/></label>
-    <label class="field"><span>Verträglichkeit</span><input id="p_compat" type="text" placeholder="z.B. freundlich / nur Hündinnen / ..."/></label>
-    <label class="field" style="min-width:100%;"><span>Ängste/Trigger/Besonderheiten</span><textarea id="p_behavior" rows="2"></textarea></label>
-  </div>
+<summary>Alltag &amp; Verhalten (optional)</summary>
+<div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
+<label class="field"><span>Standard-Futter</span><input id="p_food" type="text"/></label>
+<label class="field"><span>Fütterung (Menge/Zeiten)</span><input id="p_feeding" type="text"/></label>
+<label class="field"><span>Verträglichkeit</span><input id="p_compat" placeholder="z.B. freundlich / nur Hündinnen / ..." type="text"/></label>
+<label class="field" style="min-width:100%;"><span>Ängste/Trigger/Besonderheiten</span><textarea id="p_behavior" rows="2"></textarea></label>
+</div>
 </details>
-
-<details class="opt" open>
-  <summary>Notizen (optional)</summary>
-  <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
-    <label class="field" style="min-width:100%;"><span>Interne Notiz</span><textarea id="p_note" rows="2"></textarea></label>
-  </div>
+<details class="opt" open="">
+<summary>Notizen (optional)</summary>
+<div class="row" style="flex-wrap:wrap; gap:12px; margin-top:10px;">
+<label class="field" style="min-width:100%;"><span>Interne Notiz</span><textarea id="p_note" rows="2"></textarea></label>
+</div>
 </details>
 </div>
 </div>
@@ -215,7 +198,6 @@
 </div>
 <div class="hint" id="cpHint" style="margin-top:10px;"></div>
 </div>
-
 <div class="list" id="dogList"></div>
 </div>
 </section>
@@ -270,7 +252,6 @@
 <div id="editorContent">
 <div id="formRoot"></div>
 </div>
-
 <div class="card">
 <h2>Datenschutz (DSGVO)</h2>
 <p class="muted" id="dsGvoText"></p>
@@ -281,41 +262,39 @@
 <span>© Doggy Style Workspace · Offline‑PWA</span>
 </footer>
 <!-- Auth Gate (Weg 2B: Cloud-Sync + Rollen) -->
-<div id="authGate" class="authgate" style="display:none">
-  <div class="authgate__card">
-    <h1>Anmelden</h1>
-    <p class="muted" style="margin-top:6px">Damit alle Geräte den gleichen Stand haben, melde dich an.</p>
-    <div class="row" style="flex-wrap:wrap; gap:12px; margin-top:14px">
-      <label class="field" style="min-width:260px">
-        <span>E‑Mail</span>
-        <input id="loginEmail" type="email" autocomplete="username" placeholder="name@domain.de" />
-      </label>
-      <label class="field" style="min-width:260px">
-        <span>Passwort</span>
-        <input id="loginPass" type="password" autocomplete="current-password" />
-      </label>
-    </div>
-    <div class="row" style="gap:10px; margin-top:10px; flex-wrap:wrap">
-      <button class="btn primary" id="btnLogin">Anmelden</button>
-      <button class="btn" id="btnRegister">Registrieren</button>
-      <button class="btn" id="btnLogout" style="display:none">Abmelden</button>
-    </div>
-    <div class="hint" style="margin-top:12px">
-      <strong>Hinweis:</strong> FaceID/TouchID geht über <em>Passkeys</em>. Das schalten wir nach dem Grund-Login frei.
-    </div>
-    <div class="muted" id="authMsg" style="margin-top:10px"></div>
-  </div>
+<div class="authgate" id="authGate" style="display:none">
+<div class="authgate__card">
+<h1>Anmelden</h1>
+<p class="muted" style="margin-top:6px">Damit alle Geräte den gleichen Stand haben, melde dich an.</p>
+<div class="row" style="flex-wrap:wrap; gap:12px; margin-top:14px">
+<label class="field" style="min-width:260px">
+<span>E‑Mail</span>
+<input autocomplete="username" id="loginEmail" placeholder="name@domain.de" type="email"/>
+</label>
+<label class="field" style="min-width:260px">
+<span>Passwort</span>
+<input autocomplete="current-password" id="loginPass" type="password"/>
+</label>
 </div>
-
+<div class="row" style="gap:10px; margin-top:10px; flex-wrap:wrap">
+<button class="btn primary" id="btnLogin">Anmelden</button>
+<button class="btn" id="btnRegister">Registrieren</button>
+<button class="btn" id="btnLogout" style="display:none">Abmelden</button>
+</div>
+<div class="hint" style="margin-top:12px">
+<strong>Hinweis:</strong> FaceID/TouchID geht über <em>Passkeys</em>. Das schalten wir nach dem Grund-Login frei.
+    </div>
+<div class="muted" id="authMsg" style="margin-top:10px"></div>
+</div>
+</div>
 <!-- Firebase (optional) + Config -->
-<script src="firebase-config.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
-
-<script src="app.js"></script>
+<script defer="defer" src="firebase-config.js?v=20251227"></script>
+<script defer="defer" src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script defer="defer" src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script defer="defer" src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script defer="defer" src="app.js?v=20251227"></script>
 <script>
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=20251227');
   </script>
 <!-- Dummy für Legacy-Signatur -->
 <canvas height="1" id="sigPad" style="display:none" width="1"></canvas>

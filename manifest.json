@@ -1,6 +1,6 @@
 {
-  "name": "Doggy Style Workspace",
-  "short_name": "Doggy Workspace",
+  "name": "Doggy Style Workspace (Stand 27.12.2025)",
+  "short_name": "DoggyStyle",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0c0c10",
