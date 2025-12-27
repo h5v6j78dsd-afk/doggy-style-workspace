@@ -4,8 +4,16 @@ body{margin:0;font-family:ui-rounded,system-ui,-apple-system,"SF Pro Display","A
 background:radial-gradient(900px 600px at 20% 0%, rgba(255,204,102,.18), transparent 60%),radial-gradient(900px 600px at 90% 10%, rgba(120,180,255,.18), transparent 60%),linear-gradient(180deg,#0c0c10 0%,#12131b 100%)}
 .topbar{position:sticky;top:0;z-index:10;padding:14px 14px 10px;background:rgba(12,12,16,.70);backdrop-filter:blur(14px);border-bottom:1px solid rgba(255,255,255,.08)}
 .brand{display:flex;gap:12px;align-items:center;margin-bottom:10px}
-.brand__logo{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.08);padding:6px;object-fit:contain}
+.brand__logo{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.10);padding:7px;object-fit:contain;filter:drop-shadow(0 8px 22px rgba(0,0,0,.35));border:1px solid rgba(255,255,255,.10)}
 .brand__title{font-weight:800;font-size:16px}
+
+.brand__logo--prominent{width:68px;height:68px;padding:9px;border-radius:18px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.14);}
+.brand__logo--animated{transform-origin:center;animation:logoFloat 5.5s ease-in-out infinite;}
+@keyframes logoFloat{0%,100%{transform:translateY(0) scale(1);}50%{transform:translateY(-3px) scale(1.03);}}
+@media (prefers-reduced-motion: reduce){
+  .brand__logo--animated{animation:none;}
+}
+
 .brand__sub{color:var(--muted);font-size:12px;margin-top:2px}
 .tabs{display:flex;gap:8px;flex-wrap:wrap}
 .tab{border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.06);color:var(--text);padding:10px 12px;border-radius:999px;cursor:pointer;font-weight:650}
@@ -101,4 +109,4 @@ textarea{min-height:88px;resize:vertical}
 button:disabled{cursor:not-allowed;}
 .tabs{gap:10px;flex-wrap:wrap;}
 
-.brand__logo--big{height:56px;width:auto;opacity:1;filter:drop-shadow(0 6px 18px rgba(0,0,0,.35));}
+.brand__logo--big{width:92px;height:92px;opacity:1;padding:10px;border-radius:24px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.14);filter:drop-shadow(0 10px 28px rgba(0,0,0,.45));}
