@@ -1,3 +1,4 @@
+window.addEventListener("error",(e)=>{console.error("APP_ERROR",e.error||e.message);});
 const LS_KEY="ds_workspace_v1";
 const CAPACITY = {
   Tagesbetreuung: 13,
