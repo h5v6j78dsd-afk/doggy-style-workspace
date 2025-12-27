@@ -110,3 +110,76 @@ button:disabled{cursor:not-allowed;}
 .tabs{gap:10px;flex-wrap:wrap;}
 
 .brand__logo--big{width:92px;height:92px;opacity:1;padding:10px;border-radius:24px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.14);filter:drop-shadow(0 10px 28px rgba(0,0,0,.45));}
+
+
+/* === Background watermark (big logo) === */
+body.bg-watermark {
+  position: relative;
+}
+body.bg-watermark::before {
+  content: "";
+  position: fixed;
+  inset: -12vh -12vw;
+  background: url("assets/logo.png") center center / min(92vw, 920px) no-repeat;
+  opacity: 0.085;
+  filter: blur(0.6px) saturate(0.95);
+  transform: translateZ(0);
+  pointer-events: none;
+  z-index: 0;
+}
+body.bg-watermark::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(16,16,20,0.35) 0%, rgba(16,16,20,0.82) 70%, rgba(16,16,20,0.92) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+/* Ensure app content sits above watermark */
+.topbar, .shell, .modal, .toast {
+  position: relative;
+  z-index: 1;
+}
+
+/* === Dashboard big centered brand === */
+.dashboard-brand{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  gap:10px;
+  margin: 8px 0 10px 0;
+}
+.dashboard-brand__logo{
+  width: clamp(120px, 18vw, 220px);
+  height: auto;
+  opacity: 0.98;
+  filter: drop-shadow(0 8px 20px rgba(0,0,0,0.35));
+  animation: floatBrand 6s ease-in-out infinite;
+}
+.dashboard-brand__title{
+  font-size: clamp(18px, 2.2vw, 26px);
+  font-weight: 650;
+  letter-spacing: 0.2px;
+  opacity: 0.92;
+}
+/* Dezent – respektiert iOS "Bewegung reduzieren" */
+@keyframes floatBrand {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-6px) scale(1.01); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-brand__logo, .brand__logo--animated { animation: none !important; }
+}
+
+/* === Login page: center the brand in header === */
+body.page-login .topbar .brand{
+  margin: 0 auto;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+body.page-login .topbar .brand__text{ align-items:center; }
+body.page-login .topbar .brand__sub{ opacity:0.8; }
