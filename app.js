@@ -18,7 +18,7 @@ const CLOUD = {
   db: null,
   orgId: (window.firebaseOrgId || "doggystyle"),
   // Wenn true: bei jedem App-Start Login erzwingen (kein "eingeloggt bleiben")
-  forceLoginAlways: false,
+  forceLoginAlways: true,
   adminEmails: (window.firebaseAdminEmails || []),
   user: null,
   role: "local",
