@@ -319,12 +319,16 @@ body.page-login .topbar .brand__sub{ opacity:0.8; }
     padding:2px 0 !important;
     border-radius:0 !important;
     font-size:11px !important;
-    font-weight:650 !important;
+    font-weight:600 !important;
     letter-spacing:0 !important;
     opacity:.85 !important;
     max-width:92vw !important;
   }
   .sync-user{opacity:.65 !important;}
+
+  /* make it look like status text, not a menu pill */
+  .sync-pill::before{content:"☁️ ";}
+  .sync-user::before{content:"👤 ";}
 }
 
 /* Desktop/Tablet: keep compact status, not a nav pill */
